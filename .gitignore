@@ -1,0 +1,29 @@
+node_modules/
+dist/
+out/
+release/
+coverage/
+.vite/
+.cache/
+*.tsbuildinfo
+*.log
+logs/
+screenshots/
+.playwright-mcp/
+ai-whiteboard-*.png
+
+# Secrets: .env.example is the only env file tracked.
+.env
+.env.*
+!.env.example
+
+# Electron/user data and local recovery artifacts.
+.ai-whiteboard/
+*.aiwb-journal
+*.aiwb-recovery
+
+# OS/editor noise.
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*.log
