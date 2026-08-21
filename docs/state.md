@@ -1,7 +1,8 @@
 # state.md — current project state
 
-Updated: 2026-08-21 (round 4: text summary feature removed entirely — image-only send — see
-D-014)
+Updated: 2026-08-21 (round 6: board panel maximized to full viewport; a real CSP bug that was
+silently blocking board.html's inline bootstrap script found and fixed; the user's own manual,
+logged-in, real-extension test on claude.ai succeeded end-to-end)
 
 ## Current
 
@@ -267,18 +268,62 @@ in this project able to drive a real, authenticated site session directly.
   extension loaded (`chrome://extensions` → load unpacked → `apps/extension/dist/`) is the one
   remaining gap, same shape as chatgpt.com's.
 
+## Round 6 — user's real manual test succeeded on claude.ai; board maximized; a real CSP bug found and fixed (2026-08-21)
+
+The user manually loaded the built extension in their own real, logged-in Chrome and ran the full
+draw → 送信 → attach flow against claude.ai themselves (two screenshots showing
+`AIホワイトボード` open over a real `claude.ai/chat/...` tab, and "アップロード完了を確認しまし
+た" / the send flow completing). **This is the first fully real, authenticated, packaged-extension
+confirmation in the project** — it closes the one gap round 5 explicitly flagged as still open.
+Same session, the user also reported the board panel was still too small to draw comfortably
+("最大までしてほしい"), same complaint as an earlier ChatGPT round, and asked that Gemini's
+future adapter not repeat it.
+
+- **Board panel maximized**: `apps/extension/src/content/mount.ts`'s `.panel` was `96vw`/`92vh`
+  offset `2vw`/`4vh` (already near-fullscreen from round 2, per the user this still wasn't
+  enough) — changed to `100vw`/`100vh` at `0`/`0`, i.e. the overlay now fills the entire
+  viewport exactly. This is shared, site-independent code (`mount.ts`, not a per-site adapter),
+  so it already applies uniformly to ChatGPT, Claude, and whatever Gemini adapter comes next —
+  nothing further to do per-site for this specific complaint.
+- **Found a real, separate bug while reloading the extension to test the resize**: the Chrome
+  extensions page showed a persistent "エラー" (error) badge on the extension. Inspecting it
+  live: `board.html`'s inline `<script>window.EXCALIDRAW_ASSET_PATH = chrome.runtime.getURL('/')
+  </script>` was being silently blocked on every real page load by MV3's default CSP for
+  extension pages (`script-src 'self'`, no `unsafe-inline`) — meaning this assignment had never
+  actually executed in any real (non-dev-server) load of the board, including during round 5's
+  successful attach test. It happened to be harmless so far because Excalidraw's font loader
+  (the only consumer of this global, confirmed by grepping the built bundle) apparently degrades
+  gracefully without it, but it's a real defect nonetheless, not a hypothetical one — it was
+  sitting in the extension's own error log the whole time.
+- **Fix**: moved the assignment out of the inline `<script>` and into `apps/extension/src/
+  board/main.tsx`, run as a normal statement before `createRoot(root).render(<Board />)` — an
+  external module script (`<script type="module" src="board.js">`) is CSP-compliant, and the
+  assignment only needs to happen before Excalidraw's font loader first runs during Board's
+  render, not before module evaluation. Added a `declare global { interface Window { ... } }`
+  block for the new property (no prior global type-augmentation file existed in this app).
+- **Verified live, not just by reasoning**: rebuilt, reloaded the unpacked extension in the
+  user's real Chrome via `chrome://extensions` (driven through `chrome-devtools-mcp
+  --autoConnect`), confirmed the stale CSP error was gone from a *fresh* error log (cleared it,
+  then reloaded the actual claude.ai tab and re-opened the board — zero new errors), and
+  confirmed visually via screenshot that the board now renders as a true fullscreen overlay
+  (toolbar pinned to the very top edge, canvas filling the rest of the viewport, no visible
+  margin).
+- **Incidental**: this is also the moment P007 (Claude adapter)'s live smoke-test gap closes —
+  see `tasks.md` and `docs/adapter-smoke.md`.
+
 ## Next
 
-1. Once ChatGPT's upload limit resets, get the user's own logged-in confirmation for chatgpt.com
-   per `docs/adapter-smoke.md` — round 4's fix has not yet been confirmed by an authenticated run.
-2. Real logged-in extension-load smoke test for claude.ai too (see Round 5's last point) — load
-   `apps/extension/dist/` as an unpacked extension in a real Chrome profile and run the full
-   draw → 送信 → attach → auto-close flow through the actual content script, not simulated DOM
-   calls.
-3. If either site's fix does *not* fully resolve it, re-capture that site's real indicator markup
-   (DevTools → inspect the attachment tile while it's uploading) and diff it against the relevant
-   fixture in `waitForUploadSettle.test.ts` — a further redesign could change it again.
-4. Gemini adapter next, as its own reviewable change — see `tasks.md`.
+1. Once ChatGPT's upload limit resets, get the user's own logged-in, real-extension confirmation
+   for chatgpt.com per `docs/adapter-smoke.md` — the same kind of manual test the user already
+   completed successfully for claude.ai in round 6, still outstanding for ChatGPT.
+2. If chatgpt.com's fix does *not* fully resolve it, re-capture its real indicator markup
+   (DevTools → inspect the attachment tile while it's uploading) and diff it against
+   `REAL_CHATGPT_UPLOADING_TILE_HTML` in `waitForUploadSettle.test.ts` — a further redesign could
+   change it again.
+3. Gemini adapter next, as its own reviewable change — see `tasks.md`. Keep the round-6 board-size
+   lesson in mind: `mount.ts`'s panel sizing is already shared/site-independent (100vw/100vh), so
+   no per-site action should be needed there, but double-check Gemini's own composer doesn't need
+   different launcher-anchor handling than the fieldset/form-based approach ChatGPT and Claude use.
 
 ## Verification status
 
@@ -297,8 +342,16 @@ in this project able to drive a real, authenticated site session directly.
 - Round 5 (2026-08-21) drove the real, authenticated claude.ai session directly (the user's own
   logged-in Chrome, via `chrome-devtools-mcp --autoConnect`). Confirmed live, with a real backend
   response: the attach mechanism, the composer/file-input selectors now in `claude.ts`, and (after
-  the fix) accurate upload-settle detection. Not confirmed: the packaged extension's own content
-  script running against this site (see Round 5's last point above).
+  the fix) accurate upload-settle detection. Not confirmed at that point: the packaged extension's
+  own content script running against this site.
+- Round 6 (2026-08-21) closed that last gap: the user manually loaded the real built extension in
+  their own logged-in Chrome and completed the full draw → 送信 → attach flow on claude.ai
+  themselves — the first fully real, end-to-end, packaged-extension confirmation in this project.
+  Same round: found and fixed a real CSP bug (an inline `<script>` in `board.html` silently
+  blocked by MV3's default CSP on every real load, moved into `main.tsx`) and maximized the board
+  panel to fill the full viewport — both verified live afterward (extension reloaded via
+  `chrome://extensions`, error log confirmed clean on a fresh load, fullscreen layout confirmed by
+  screenshot).
 
 ## Known assumptions
 

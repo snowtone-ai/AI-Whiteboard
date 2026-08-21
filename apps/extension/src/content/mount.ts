@@ -66,11 +66,9 @@ export function mountLauncher(adapter: SiteAdapter): void {
       .panel {
         all: initial;
         position: fixed;
-        width: 96vw;
-        height: 92vh;
-        border-radius: 8px;
+        width: 100vw;
+        height: 100vh;
         overflow: hidden;
-        box-shadow: 0 12px 32px rgba(17, 24, 29, 0.4);
       }
       .panel iframe {
         all: initial;
@@ -132,8 +130,8 @@ export function mountLauncher(adapter: SiteAdapter): void {
 
     const panel = document.createElement('div')
     panel.className = 'panel'
-    panel.style.left = '2vw'
-    panel.style.top = '4vh'
+    panel.style.left = '0'
+    panel.style.top = '0'
     panel.addEventListener('click', (event) => event.stopPropagation())
 
     iframe = document.createElement('iframe')
