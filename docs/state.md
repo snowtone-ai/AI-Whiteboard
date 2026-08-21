@@ -160,27 +160,80 @@ Sources: [Vision Language Model-based Caption Evaluation Method](https://arxiv.o
 [Beyond Intermediate States: Explaining Visual Redundancy through Language](https://arxiv.org/pdf/2503.20540),
 [Overcoming Vision Language Model Challenges in Diagram Understanding](https://arxiv.org/abs/2502.04389)
 
+## Round 4 — root cause found and fixed via live automated verification against real chatgpt.com (2026-08-21)
+
+The user reported that after round 3's fixes (auto-close + `waitForUploadSettle`), the image
+still did not reach ChatGPT when they tried it themselves. This environment still has no
+logged-in Chrome session, but it does now have the tools to test the real, built extension
+against the real live site, unauthenticated — which turned out to be enough to reproduce and
+fix the actual bug:
+
+- **Method**: built the real extension (`pnpm build`), installed `playwright` (temporary, in
+  the OS scratch dir, not a project dependency) with a real Chromium, and launched a persistent
+  context with `--load-extension=<dist>` pointed at the actual `apps/extension/dist/` output —
+  the real content script, running in its real isolated world, against the real
+  `https://chatgpt.com/` DOM. Logged out, so the final "did OpenAI's backend accept the upload"
+  step can't be confirmed this way — but everything up to that (composer lookup, file-input
+  lookup, the synthetic `DataTransfer` + `change` event, ChatGPT's own client-side handling of
+  it, the upload-in-progress indicator, and the board's auto-close) is fully exercised.
+- **The file-attach mechanism itself works.** Drawing a stroke, pressing 送信, and inspecting
+  the real composer afterward showed `#upload-files` correctly populated with `whiteboard.png`
+  and a real thumbnail (`<img src="blob:...">`) rendered by ChatGPT's own code — the
+  `attachImageFile` technique (isolated-world `File` via `DataTransfer` + a dispatched `change`
+  event) is not the problem. This rules out the "wrong/missing file input" and "cross-world File
+  object" theories that were the leading suspects going in.
+- **The actual bug**: `UPLOAD_INDICATOR_SELECTOR` (`apps/extension/src/content/insert/
+  waitForUploadSettle.ts`) never matched chatgpt.com's real upload-in-progress markup. Captured
+  directly from the live DOM while an upload was in flight: a radial SVG progress ring
+  (`<circle stroke-dashoffset="...">`) inside a wrapper carrying a `cursor-wait` class — none of
+  which contains "progress", "spinner", or "loading", the only substrings the old selector
+  looked for. So `waitForUploadSettle` never once observed the busy state on this site; every
+  real attach fell through to `no-indicator` only after burning the full 8-second `maxWaitMs`,
+  and — because `runInsertionLadder` treats `no-indicator` the same as a confirmed `settled` —
+  reported "アップロード完了を確認しました" (upload confirmed) on pure timeout, not real
+  confirmation. Re-running the same live Playwright reproduction after the fix showed the panel
+  auto-closing markedly faster (~6s vs ~10.5s), consistent with the indicator now actually being
+  observed and cleared instead of the selector blindly waiting out the deadline.
+- **Fix**: added `[class*="cursor-wait" i]` and `circle[stroke-dashoffset]` to
+  `UPLOAD_INDICATOR_SELECTOR`, still deliberately generic (a "cursor-wait" utility class and a
+  radial SVG progress ring are common patterns, not chatgpt.com-specific markup) rather than
+  hardcoding today's exact class names. Added a regression test
+  (`waitForUploadSettle.test.ts`) using the real captured markup as a fixture (`jsdom`, added as
+  a new dev dependency for this one DOM-selector test — the rest of the suite stays on the
+  default `node` environment) so this selector can never silently stop matching this pattern
+  again without a test failing.
+- **Still not fully closed**: this confirms the client-side attach and indicator-detection path
+  end-to-end, but not the actual backend upload succeeding under a real, authenticated OpenAI
+  account, nor the message actually reaching the model. That last step still needs the user's
+  own logged-in confirmation per `docs/adapter-smoke.md` — but the specific, previously-unknown
+  defect that was silently corrupting the "is it safe to send yet" signal on the real site is now
+  identified, fixed, and covered by a test, not just re-guessed a third time.
+
 ## Next
 
-1. Manual smoke test on chatgpt.com with a real logged-in session (cannot be run from this
-   environment — see `docs/adapter-smoke.md` for the checklist and record the result there).
-   In particular, confirm whether the board auto-closing and the new `waitForUploadSettle`
-   heuristic actually fix "image not reaching the AI" for real — round 2's fixed-delay mitigation
-   was reported to still fail, and round 3's fixes are unverified against the live site.
-2. Load the unpacked extension (`apps/extension/dist/` after `pnpm build`) via
-   `chrome://extensions` → Developer mode → Load unpacked, and confirm the launcher button
-   appears, the board opens, and send attaches an image to the composer.
+1. Manual smoke test on chatgpt.com with a real, logged-in Chrome session — the one remaining
+   gap round 4 could not close from this environment (see `docs/adapter-smoke.md` for the
+   checklist, record the result there). Round 4 verified the client-side attach and indicator
+   mechanism end-to-end against the live site unauthenticated and fixed a real defect in it, but
+   only a logged-in run can confirm the image actually reaches the model.
+2. If the round-4 fix does *not* fully resolve it for the user, the next place to look is the
+   `apps/extension/src/content/insert/waitForUploadSettle.test.ts` fixture: capture the real
+   indicator markup again (DevTools → inspect the attachment tile while it's uploading) and diff
+   it against `REAL_CHATGPT_UPLOADING_TILE_HTML` — a further redesign could change it again.
 3. Claude adapter, then Gemini adapter, each as its own reviewable change — see `tasks.md`.
 
 ## Verification status
 
-- `pnpm verify` (lint, typecheck, test, build) passes locally: 17 tests (4 for
+- `pnpm verify` (lint, typecheck, test, build) passes locally: 19 tests (6 for
   `waitForUploadSettle`, 13 existing in `packages/core`), clean lint/typecheck, extension bundle
   builds (`content.js` ~5KB, `board.js` ~8MB minified — Excalidraw + React bundled once).
-- No live-browser smoke test has been run yet. The adapter (`apps/extension/src/content/
-  adapters/chatgpt.ts`) targets ChatGPT's current DOM as of this writing; it is written to
-  degrade to the clipboard fallback rather than fail outright if the markup has moved, but
-  that has not been exercised against the live site.
+- Round 4 (2026-08-21) ran the real built extension against live `https://chatgpt.com/` via a
+  Playwright-launched Chromium with `--load-extension`, unauthenticated. Confirmed live: the
+  launcher mounts, the board opens, `findComposer`/`findFileInput` resolve to the real
+  `#prompt-textarea`/`#upload-files`, the synthetic file-attach is accepted by ChatGPT's own code
+  (real thumbnail rendered), and the board auto-closes after `waitForUploadSettle` resolves. Not
+  confirmed: the authenticated backend upload succeeding and the image reaching the model — that
+  requires the user's own logged-in session (see `docs/adapter-smoke.md`).
 
 ## Known assumptions
 

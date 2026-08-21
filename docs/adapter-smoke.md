@@ -41,7 +41,7 @@ weeks as unverified.
 
 | Site | Last verified | Result | Notes |
 |---|---|---|---|
-| chatgpt.com | *(not yet run)* | — | Built and unit-tested; no live-browser pass yet. |
+| chatgpt.com | 2026-08-21 (partial, automated) | Attach mechanism confirmed live; login-gated steps still open | Playwright-driven Chromium with the real `--load-extension` build against live chatgpt.com, unauthenticated (see `docs/state.md` round 4). Confirmed: launcher mounts, board opens, drawing + 送信 attaches a real thumbnail via `#upload-files`, panel auto-closes once `waitForUploadSettle` settles. Found and fixed a real defect: `UPLOAD_INDICATOR_SELECTOR` never matched chatgpt.com's actual upload-spinner markup (a `cursor-wait` + `circle[stroke-dashoffset]` radial ring), so every real attach was silently timing out its confidence check instead of observing it — now fixed and covered by a regression test using the captured markup. **Not confirmed**: authenticated backend upload success or the image reaching the model — needs a real logged-in run by the owner. |
 | chat.openai.com | *(not yet run)* | — | Redirects to chatgpt.com in most sessions; confirm the redirect still lands the content script. |
 | claude.ai | *(not built)* | — | Planned next phase — see `tasks.md`. |
 | gemini.google.com | *(not built)* | — | Planned last — composer is the most unusual of the three. |

@@ -16,7 +16,9 @@
       "nanoid@<4.0.0": "3.3.18",
       "nanoid@>=4.0.0 <6.0.0": "5.1.16"
     },
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   },
   "scripts": {
     "setup": "node scripts/setup.mjs",
@@ -35,6 +37,7 @@
     "@types/react": "^18.3.20",
     "@types/react-dom": "^18.3.6",
     "eslint": "^9.24.0",
+    "jsdom": "^30.0.1",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.31.0",
     "vitest": "^3.1.2"

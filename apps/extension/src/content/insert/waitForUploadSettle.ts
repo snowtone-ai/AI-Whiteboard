@@ -54,6 +54,15 @@ export async function waitForUploadSettle(
  * indicator" — deliberately broad (case-insensitive substring match) so it
  * has a chance of matching whatever class names a redesign introduces,
  * rather than a brittle exact selector tied to today's chatgpt.com markup.
+ *
+ * `cursor-wait` and `circle[stroke-dashoffset]` were added after live
+ * verification against chatgpt.com's real attachment-tile markup (a
+ * Playwright run of the actual built extension against chatgpt.com, see
+ * docs/state.md): its upload-in-progress indicator is a radial SVG
+ * progress ring (`<circle stroke-dashoffset="...">`) inside a wrapper with
+ * a `cursor-wait` class, and matches none of "progress"/"spinner"/
+ * "loading" — so every real attach on this site was silently falling
+ * through to 'no-indicator' instead of ever observing the busy state.
  */
 export const UPLOAD_INDICATOR_SELECTOR =
-  '[role="progressbar"], [aria-busy="true"], [class*="progress" i], [class*="spinner" i], [class*="loading" i]'
+  '[role="progressbar"], [aria-busy="true"], [class*="progress" i], [class*="spinner" i], [class*="loading" i], [class*="cursor-wait" i], circle[stroke-dashoffset]'
