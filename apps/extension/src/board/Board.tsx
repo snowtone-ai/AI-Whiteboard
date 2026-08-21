@@ -88,7 +88,10 @@ export function Board() {
       const message = event.data
       if (!message || message.type !== 'ai-whiteboard:result') return
       if (message.outcome === 'attached') {
-        setStatus({ kind: 'done', text: '送信欄に添付しました。内容を確認して送信してください。' })
+        setStatus({
+          kind: 'done',
+          text: '送信欄に添付しました。画像の読み込み表示が消えて（アップロード完了）から送信してください。',
+        })
       } else if (message.outcome === 'clipboard-fallback') {
         setStatus({ kind: 'done', text: '画像をコピーしました。入力欄で Ctrl+V を押して貼り付けてください。' })
       } else {
@@ -102,13 +105,13 @@ export function Board() {
   return (
     <div className="board-shell">
       <div className="board-header">
-        <span className="board-title">AI Whiteboard</span>
+        <span className="board-title">AIホワイトボード</span>
         <button type="button" className="icon" onClick={handleClose} aria-label="閉じる">
           ✕
         </button>
       </div>
       <div className="board-canvas">
-        <Excalidraw excalidrawAPI={(api) => (apiRef.current = api)} />
+        <Excalidraw langCode="ja-JP" excalidrawAPI={(api) => (apiRef.current = api)} />
       </div>
       <div className="board-footer">
         <span className="board-status">

@@ -22,6 +22,10 @@ weeks as unverified.
      - attaches the image to the composer and inserts the ordered text description, or
      - falls back to "copied to clipboard" with a visible message, and Ctrl+V in the composer
        actually pastes the image.
+   - [ ] After attach, wait for the upload-in-progress indicator on the thumbnail to clear
+         before pressing the site's send button, then confirm the image actually reaches the AI
+         (not just a thumbnail in the composer) — the extension only waits 1200ms before
+         reporting success, which is a best-effort delay, not a guarantee the upload finished.
    - [ ] Nothing is auto-submitted — the message stays in the composer until the site's own
          send button is pressed by hand.
    - [ ] No uncaught errors appear in the page's DevTools console attributable to the extension.

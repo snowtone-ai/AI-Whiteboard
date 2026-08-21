@@ -22,6 +22,18 @@ function findComposer(): HTMLElement | null {
   return textarea
 }
 
+/**
+ * The composer text node itself is only as tall as the typed text, so
+ * anchoring the launcher button to its rect makes the button drift as the
+ * box grows/shrinks. The surrounding <form> is the whole input bar
+ * (roughly constant height), which is what "beside the input field" means.
+ */
+function findComposerBar(): HTMLElement | null {
+  const composer = findComposer()
+  if (!composer) return null
+  return composer.closest('form') ?? composer
+}
+
 function findFileInput(): HTMLInputElement | null {
   const composer = findComposer()
   const form = composer?.closest('form')
@@ -33,7 +45,7 @@ function findFileInput(): HTMLInputElement | null {
 
 export const chatgptAdapter: SiteAdapter = {
   id: 'chatgpt',
-  findAnchor: findComposer,
+  findAnchor: findComposerBar,
   findComposer,
   findFileInput,
 }

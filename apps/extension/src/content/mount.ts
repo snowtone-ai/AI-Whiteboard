@@ -66,8 +66,8 @@ export function mountLauncher(adapter: SiteAdapter): void {
       .panel {
         all: initial;
         position: fixed;
-        width: min(520px, 92vw);
-        height: min(640px, 86vh);
+        width: 96vw;
+        height: 92vh;
         border-radius: 8px;
         overflow: hidden;
         box-shadow: 0 12px 32px rgba(17, 24, 29, 0.4);
@@ -91,7 +91,7 @@ export function mountLauncher(adapter: SiteAdapter): void {
     button.type = 'button'
     button.className = 'launcher'
     button.textContent = '✎'
-    button.setAttribute('aria-label', 'AI Whiteboardを開く')
+    button.setAttribute('aria-label', 'AIホワイトボードを開く')
     button.addEventListener('click', openOverlay)
     root.appendChild(button)
   }
@@ -105,8 +105,18 @@ export function mountLauncher(adapter: SiteAdapter): void {
     const anchor = adapter.findAnchor()
     if (!anchor) return
     const rect = anchor.getBoundingClientRect()
-    button.style.left = `${Math.max(8, rect.right - 48)}px`
-    button.style.top = `${Math.max(8, rect.top - 48)}px`
+    const buttonSize = 40
+    const gap = 12
+    const spaceRight = window.innerWidth - rect.right
+
+    // Prefer sitting in the empty margin to the right of the input bar,
+    // vertically centered on it. Only fall back to overlapping the bar's
+    // own right edge when the viewport is too narrow to have that margin.
+    const left = spaceRight >= buttonSize + gap * 2 ? rect.right + gap : Math.max(8, rect.right - buttonSize - gap)
+    const top = rect.top + rect.height / 2 - buttonSize / 2
+
+    button.style.left = `${Math.max(8, Math.min(left, window.innerWidth - buttonSize - 8))}px`
+    button.style.top = `${Math.max(8, Math.min(top, window.innerHeight - buttonSize - 8))}px`
   }
 
   function openOverlay(): void {
@@ -122,8 +132,8 @@ export function mountLauncher(adapter: SiteAdapter): void {
 
     const panel = document.createElement('div')
     panel.className = 'panel'
-    panel.style.left = 'calc(50vw - min(260px, 46vw))'
-    panel.style.top = 'calc(50vh - min(320px, 43vh))'
+    panel.style.left = '2vw'
+    panel.style.top = '4vh'
     panel.addEventListener('click', (event) => event.stopPropagation())
 
     iframe = document.createElement('iframe')
@@ -161,7 +171,16 @@ export function mountLauncher(adapter: SiteAdapter): void {
     if (fileInput) {
       const file = new File([png], 'whiteboard.png', { type: 'image/png' })
       const attached = attachImageFile(fileInput, file)
-      if (attached) return 'attached'
+      if (attached) {
+        // Dispatching 'change' only starts the site's own upload of the
+        // file to its backend — it does not mean the upload is finished.
+        // There is no reliable, non-fragile way to detect "upload done" from
+        // outside the site's own UI, so the board's success message tells
+        // the user to wait for the preview to finish loading before
+        // pressing send, rather than implying it's safe to send immediately.
+        await new Promise((resolve) => setTimeout(resolve, 1200))
+        return 'attached'
+      }
     }
 
     try {
