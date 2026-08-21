@@ -118,6 +118,15 @@ export function mountLauncher(adapter: SiteAdapter): void {
   }
 
   function openOverlay(): void {
+    // Must run synchronously, before anything else, while this call is
+    // still inside the launcher button's own trusted click handler — some
+    // adapters depend on that trust window (see SiteAdapter.prepareForOpen).
+    try {
+      adapter.prepareForOpen?.()
+    } catch (error) {
+      console.error('[ai-whiteboard] prepareForOpen failed', error)
+    }
+
     const root = ensureHost()
     if (overlay) {
       overlay.style.display = 'flex'
@@ -181,6 +190,11 @@ export function mountLauncher(adapter: SiteAdapter): void {
 
     try {
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })])
+      // Focusing the composer here means the only action left for the user
+      // is the paste keystroke itself — a real paste can't be synthesized
+      // from a content script (browsers don't allow it), but placing the
+      // cursor for them is a plain DOM operation and isn't gated the same way.
+      adapter.findComposer()?.focus()
       return 'clipboard-fallback'
     } catch (error) {
       console.error('[ai-whiteboard] clipboard fallback failed', error)
