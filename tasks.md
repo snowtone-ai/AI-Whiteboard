@@ -1,4 +1,4 @@
-# tasks.md — pm-zero v12 execution ledger
+# tasks.md — pm-zero v12.1 execution ledger
 
 ## Goal binding
 
@@ -31,6 +31,7 @@ complete · `done` = accepted · `verified` = evidence recorded.
 | T009 | verified | main | T003,T004,T005,T008 | export/import | Portable board + Context Capsule export/import and SVG/PNG/PDF/Markdown/JSON outputs work without secrets; imports are schema-checked | build, round-trip and export UI smoke | session round-trip boundary and all export choices verified |
 | T010 | verified | main | T001–T009 | integration/release | Complete Windows desktop flow: capture → scoped send → proposal → review → accept/reject → replay → export → crash recovery; account/backend/telemetry remain absent | full smoke, package build, CI | local flow and prior 4-process packaged smoke pass; final 151.7 MB NSIS installer generated (unsigned final EXE is blocked by this host's application-control policy) |
 | T011 | verified | main | T010 | docs/handoff | README/operator docs, `docs/state.md`, this ledger and Japanese handoff record commands, evidence and residual risks | `git diff --check`, `pnpm verify`, gitleaks if available | fresh Luna/max review completed; all 7 findings fixed; 26 tests, production audit 0, diff check and staged-secret scan pass |
+| T012 | verified | main | T011 | pm-zero v12.1 operating layer | UI検出セットアップ、プロジェクト限定 DevTools MCP、トークン登録簿と差分 lint、最小化したグローバル Codex 構成を適用する | `node scripts/setup.mjs`, `pnpm verify`, `git diff --check`, `gitleaks git --no-banner` | setup、26 tests、build、diff check、secret scan pass |
 
 ## Execution rule
 

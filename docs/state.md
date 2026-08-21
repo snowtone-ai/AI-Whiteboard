@@ -1,6 +1,6 @@
 # state.md — current project state
 
-Updated: 2026-08-20
+Updated: 2026-08-21
 
 ## Current
 
@@ -9,6 +9,11 @@ It includes the Excalidraw canvas, provider-neutral AWCP Context Lens, OpenAI/An
 streaming adapters, semantic capsules, reviewable AI proposals, local history/replay,
 voice input, import/export, atomic persistence and encrypted API-key storage. The application
 does not require an account, backend or telemetry service.
+
+The pm-zero v12.1 UI operating layer is applied: setup detects the React UI, provisions only
+the project-local Impeccable skill and Chrome DevTools MCP, and `verify` checks registered
+design values in changed frontend lines. Global Codex integration is reduced to `context7`;
+browser and artifact plugins remain disabled unless a future task has a concrete need.
 
 ## Product contract to preserve
 
