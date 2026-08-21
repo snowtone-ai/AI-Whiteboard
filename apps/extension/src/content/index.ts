@@ -1,11 +1,13 @@
 import { chatgptAdapter } from './adapters/chatgpt'
 import { claudeAdapter } from './adapters/claude'
+import { geminiAdapter } from './adapters/gemini'
 import type { SiteAdapter } from './adapters/types'
 import { mountLauncher } from './mount'
 
 function selectAdapter(hostname: string): SiteAdapter | null {
   if (hostname === 'chatgpt.com' || hostname === 'chat.openai.com') return chatgptAdapter
   if (hostname === 'claude.ai') return claudeAdapter
+  if (hostname === 'gemini.google.com') return geminiAdapter
   return null
 }
 

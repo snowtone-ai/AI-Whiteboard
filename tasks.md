@@ -29,7 +29,7 @@ complete · `done` = accepted · `verified` = evidence recorded.
 | P005 | verified | main | P003,P004 | `apps/extension/src/content/insert/`, `mount.ts` | Board→host messaging is origin-validated both directions; insertion ladder tries file-attach then clipboard fallback, never auto-submits, never reads a response | code review against D-011/D-013 | postMessage targetOrigin/origin checks present; no submit/read code path exists |
 | P006 | review | main | P003,P004,P005 | (none — verification only) | Live ChatGPT smoke test passes the `docs/adapter-smoke.md` checklist | manual, logged-in Chrome session | partially run 2026-08-21: unauthenticated Playwright run against live chatgpt.com confirmed the attach mechanism end-to-end and found/fixed a real `UPLOAD_INDICATOR_SELECTOR` defect (see `docs/state.md` round 4, `docs/adapter-smoke.md`); the login-gated "reaches the model" step still needs the owner's own session |
 | P007 | verified | main | P006 | `apps/extension/manifest.json`, `src/content/adapters/claude.ts` | Claude (claude.ai) adapter added as its own reviewable change; host_permissions extended explicitly | unit tests for any pure logic, manual smoke | `claude.ts` built and wired in (`src/content/index.ts` now selects by hostname); `manifest.json` extended explicitly to `https://claude.ai/*`. Round 5 (2026-08-21) verified the attach mechanism and fixed a real `UPLOAD_INDICATOR_SELECTOR` defect via `chrome-devtools-mcp --autoConnect` against the user's authenticated session. Round 6 (2026-08-21) closed the remaining gap: the user manually loaded the real built extension unpacked in their own logged-in Chrome and completed the full draw → 送信 → attach flow themselves (see `docs/state.md` rounds 5–6, `docs/adapter-smoke.md`) — the first fully real, packaged-extension pass in this project. Same round found/fixed a real CSP bug in `board.html` and maximized the board panel, both re-verified live |
-| P008 | ready | main | P007 | `apps/extension/manifest.json`, `src/content/adapters/gemini.ts` | Gemini (gemini.google.com) adapter added last — most unusual composer of the three | unit tests for any pure logic, manual smoke | — |
+| P008 | review | main | P007 | `apps/extension/manifest.json`, `src/content/adapters/gemini.ts` | Gemini (gemini.google.com) adapter added last — most unusual composer of the three | unit tests for any pure logic, manual smoke | `gemini.ts` built and wired in (`src/content/index.ts` now also routes `gemini.google.com`); `manifest.json` extended explicitly. Round 7 (2026-08-21) verified composer/anchor selectors and the full draw → 送信 → attach flow live via `chrome-devtools-mcp` against the user's authenticated session, including through the actual board UI. Found that Gemini's file input is menu-gated behind a browser-trusted click a content script cannot generate (confirmed two approaches don't work: plain `.click()`, synthetic `drop` event) — the adapter relies on the existing clipboard-fallback tier instead, confirmed working with a real Ctrl+V paste. Remaining gap: the user's own manual pass with the packaged extension (same shape as P007's round 6) hasn't happened yet — see `docs/adapter-smoke.md`. |
 | P009 | verified | main | P002–P005 | `docs/*.md`, `README.md`, `tasks.md` | Docs describe the extension product, not the archived desktop app; decisions D-009–D-013 record the pivot | `git diff --check`, `pnpm verify` | this ledger entry |
 
 ## Execution rule
@@ -43,10 +43,13 @@ part, and a stale date there is a real signal to re-check, not paperwork.
 
 `pnpm verify` (lint, typecheck, test, build) passes locally; 22 tests. This environment can now
 drive the user's own real, logged-in Chrome via `chrome-devtools-mcp --autoConnect` (see
-`docs/state.md` rounds 5–6). P007 (claude.ai) is now `verified` — the user completed a full
-manual, real-extension, logged-in smoke test themselves, which also surfaced and closed out two
-real bugs (a CSP-blocked inline script in `board.html`, and the board panel not filling the
-viewport — the latter fix is in shared `mount.ts`, so it already applies to every site). P006
-(chatgpt.com) is the one remaining smoke-test gap, blocked ~3h by the owner's free-tier upload
-limit as of 2026-08-21 — same manual-test shape as P007 just closed. Gemini (P008) is next up
-once P006 closes.
+`docs/state.md` rounds 5–7). P007 (claude.ai) is `verified` — the user completed a full manual,
+real-extension, logged-in smoke test themselves, which also surfaced and closed out two real bugs
+(a CSP-blocked inline script in `board.html`, and the board panel not filling the viewport — the
+latter fix is in shared `mount.ts`, so it already applies to every site). P008 (gemini.google.com)
+is now `review` — built and live-verified end-to-end via `chrome-devtools-mcp`, including a real
+finding (its file input is menu-gated behind a browser-trusted click a content script cannot
+generate, so it relies on the clipboard-fallback tier, itself confirmed working live) — still
+needs the user's own manual pass to reach `verified`, same as P007's round 6. P006 (chatgpt.com)
+remains the one open smoke-test gap, blocked by the owner's free-tier upload limit as of
+2026-08-21 — same manual-test shape needed for all three sites now.

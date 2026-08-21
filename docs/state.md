@@ -1,8 +1,7 @@
 # state.md — current project state
 
-Updated: 2026-08-21 (round 6: board panel maximized to full viewport; a real CSP bug that was
-silently blocking board.html's inline bootstrap script found and fixed; the user's own manual,
-logged-in, real-extension test on claude.ai succeeded end-to-end)
+Updated: 2026-08-21 (round 7: Gemini adapter built and live-verified end-to-end via
+chrome-devtools-mcp, including full board UI draw → 送信 → clipboard-paste attach confirmation)
 
 ## Current
 
@@ -311,6 +310,46 @@ future adapter not repeat it.
 - **Incidental**: this is also the moment P007 (Claude adapter)'s live smoke-test gap closes —
   see `tasks.md` and `docs/adapter-smoke.md`.
 
+## Round 7 — Gemini adapter (2026-08-21)
+
+Built and live-verified `apps/extension/src/content/adapters/gemini.ts` against the user's real,
+authenticated `gemini.google.com` session via `chrome-devtools-mcp --autoConnect`, following the
+same methodology as rounds 5–6.
+
+- **Gemini's file input does not exist at rest** — unlike ChatGPT/Claude, where a hidden
+  `<input type="file">` is always present in the DOM, Gemini's is an Angular component
+  instantiated only while the "アップロードとツール" menu is open (confirmed live: 0 file inputs
+  in the DOM normally, 3 appear only after opening that menu, all destroyed again on close).
+- **The menu can only be opened by a browser-trusted click** — confirmed live that a
+  content-script-style `.click()` call on the toggle button does nothing (no menu appears, with
+  or without a delay), while the same call via `chrome-devtools-mcp`'s CDP-level trusted click
+  does open it. A content script cannot generate a trusted click, so this path is not
+  automatable from within the extension. A synthetic `drop` event with a real, populated
+  `DataTransfer` against the composer's dropzone (`[xapfileselectordropzone]`) was also tried and
+  confirmed *not* to work (Angular's dropzone directive never reacted, despite the event
+  correctly carrying file data to a manually-attached listener) — abandoned rather than shipped
+  half-working.
+- **Decision**: `findFileInput()` returns null whenever the menu-gated input isn't already open
+  (the common case), which the existing insertion ladder in `mount.ts` already handles by
+  falling through to the clipboard tier automatically — no interface change needed.
+- **Confirmed the clipboard-fallback path actually works on this site**: wrote a real PNG to the
+  clipboard and pressed Ctrl+V (a genuine trusted keypress, via `chrome-devtools-mcp`'s
+  `press_key`) into Gemini's composer — the image attached correctly (Gemini's editor is a Quill
+  instance with built-in paste support).
+- **Full end-to-end live test through the actual board UI**: opened the real launcher button,
+  drew a text element on the real board (canvas drag wasn't available through the connected
+  tooling, so the text tool was used instead — same insertion ladder either way, since both just
+  export a PNG), pressed 送信, confirmed the panel auto-closed, then pressed Ctrl+V in Gemini's
+  composer and confirmed the drawn PNG attached as a real thumbnail. Cleaned up the test
+  attachment afterward so it didn't pollute the user's real chat history.
+- `apps/extension/manifest.json` extended to `https://gemini.google.com/*` (content script
+  matches, web-accessible-resources matches, host_permissions).
+- `apps/extension/src/content/index.ts`'s `selectAdapter` now also routes
+  `gemini.google.com` → `geminiAdapter`.
+- `pnpm verify` (lint, typecheck, test, build) passes; no new tests needed since Gemini's adapter
+  has no new pure logic to unit-test (its selectors are DOM lookups already exercised live, and
+  it doesn't touch `UPLOAD_INDICATOR_SELECTOR` since the file-attach tier is never reached here).
+
 ## Next
 
 1. Once ChatGPT's upload limit resets, get the user's own logged-in, real-extension confirmation
@@ -320,10 +359,9 @@ future adapter not repeat it.
    (DevTools → inspect the attachment tile while it's uploading) and diff it against
    `REAL_CHATGPT_UPLOADING_TILE_HTML` in `waitForUploadSettle.test.ts` — a further redesign could
    change it again.
-3. Gemini adapter next, as its own reviewable change — see `tasks.md`. Keep the round-6 board-size
-   lesson in mind: `mount.ts`'s panel sizing is already shared/site-independent (100vw/100vh), so
-   no per-site action should be needed there, but double-check Gemini's own composer doesn't need
-   different launcher-anchor handling than the fieldset/form-based approach ChatGPT and Claude use.
+3. Get the user's own manual, packaged-extension confirmation for gemini.google.com too, same
+   shape as the claude.ai round-6 test — this round's live verification was thorough but was
+   still driven through `chrome-devtools-mcp`, not a fully independent user pass.
 
 ## Verification status
 
@@ -352,6 +390,12 @@ future adapter not repeat it.
   panel to fill the full viewport — both verified live afterward (extension reloaded via
   `chrome://extensions`, error log confirmed clean on a fresh load, fullscreen layout confirmed by
   screenshot).
+- Round 7 (2026-08-21) built the Gemini adapter and confirmed live that its file input is
+  menu-gated behind a browser-trusted click that a content script cannot generate (both a plain
+  `.click()` and a synthetic `drop` event were tried and confirmed not to work), so the adapter
+  relies on the existing clipboard-fallback tier — confirmed working via a real Ctrl+V paste, and
+  then confirmed again through the actual board UI end-to-end (draw → 送信 → auto-close → paste
+  → real thumbnail attached, then cleaned up).
 
 ## Known assumptions
 
