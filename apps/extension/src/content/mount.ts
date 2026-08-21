@@ -118,15 +118,6 @@ export function mountLauncher(adapter: SiteAdapter): void {
   }
 
   function openOverlay(): void {
-    // Must run synchronously, before anything else, while this call is
-    // still inside the launcher button's own trusted click handler — some
-    // adapters depend on that trust window (see SiteAdapter.prepareForOpen).
-    try {
-      adapter.prepareForOpen?.()
-    } catch (error) {
-      console.error('[ai-whiteboard] prepareForOpen failed', error)
-    }
-
     const root = ensureHost()
     if (overlay) {
       overlay.style.display = 'flex'

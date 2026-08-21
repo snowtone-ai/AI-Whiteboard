@@ -1,8 +1,8 @@
 # state.md — current project state
 
-Updated: 2026-08-21 (round 8: Gemini's clipboard-paste requirement eliminated — the extension now
-auto-attaches on send by spending the launcher button's one trusted click to reveal Gemini's
-menu-gated file input ahead of time; live-verified end-to-end with no Ctrl+V needed)
+Updated: 2026-08-21 (round 9: reverted round 8's Gemini auto-attach trick — its accepted native-
+file-picker risk materialized in real use, so the interception was removed and Gemini is back on
+the user-verified clipboard-fallback tier only)
 
 ## Current
 
@@ -419,6 +419,36 @@ that Gemini's file input is gated behind a menu only a browser-trusted click can
   net if it ever fires for real.
 - `pnpm verify` (lint, typecheck, test, build) passes; no new tests added (all of this round's
   logic is DOM interaction exercised live, not pure logic with a clean unit boundary).
+
+## Round 9 — Gemini auto-attach reverted after the accepted risk fired for real (2026-08-21)
+
+Round 8's accepted risk was not hypothetical after all: on the user's next real use, clicking the
+launcher button opened a genuine Windows "ファイルを開く" native file dialog (screenshot-confirmed)
+instead of silently revealing the file input. The user cancelled it by hand, and after that the
+clipboard-fallback flow completed the send to Gemini normally — then asked for the dialog to be
+eliminated.
+
+- **Root cause is exactly what round 8 flagged as the risk**: the interception in
+  `clickWithoutOpeningNativeFilePicker` is only safe while Gemini's own click handler calls the
+  hidden `<input type="file">`'s `.click()` *synchronously* inside the menu item's click handler.
+  That stopped holding in practice, so the real native picker opened.
+- **No reliable hardening exists from a content script.** There's no way to guarantee interception
+  of a call whose timing this adapter doesn't control and can't observe in advance — a longer
+  interception window, a MutationObserver, or a capture-phase listener on the input would all be
+  guessing at Gemini's internal timing rather than fixing it.
+- **Decision: remove the interception entirely, not patch it.** `gemini.ts` no longer implements
+  `prepareForOpen`; the whole `ensureFileInputRevealed`/`revealFileInput`/
+  `clickWithoutOpeningNativeFilePicker` mechanism and its constants are deleted.
+  `SiteAdapter.prepareForOpen` is removed from `types.ts` (no adapter used it besides gemini.ts)
+  and its call site in `mount.ts`'s `openOverlay()` is removed too — no dead optional hook left
+  behind. `findFileInput()` now simply never finds an input at rest, same as before round 8, so
+  every Gemini send goes through the clipboard-fallback tier (write image to clipboard, focus the
+  composer) — the same path the user already verified working end-to-end, both in round 7 and
+  again just now when the native dialog was cancelled.
+- `pnpm verify` (lint, typecheck, 22 tests, build) passes after the revert.
+- P008 stays at `review`: the feature surface is smaller now (clipboard-fallback only, matching
+  claude.ai and chatgpt.com's shared design), but still needs the user's own manual pass with the
+  packaged extension before `verified`, same as the other two sites.
 
 ## Next
 
