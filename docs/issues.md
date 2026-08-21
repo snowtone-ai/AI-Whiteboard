@@ -11,3 +11,4 @@ the manual checklist and record the result before relying on this for real use.
 When a blocker appears, add one row with the task ID, exact symptom, owner, needed decision,
 and the next safe action. Remove the row when resolved; this file is read at session start and
 is not an archive of old failures.
+- budget wall hit; session ended by rate limit

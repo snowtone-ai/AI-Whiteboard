@@ -1,7 +1,8 @@
 # state.md — current project state
 
-Updated: 2026-08-21 (round 7: Gemini adapter built and live-verified end-to-end via
-chrome-devtools-mcp, including full board UI draw → 送信 → clipboard-paste attach confirmation)
+Updated: 2026-08-21 (round 8: Gemini's clipboard-paste requirement eliminated — the extension now
+auto-attaches on send by spending the launcher button's one trusted click to reveal Gemini's
+menu-gated file input ahead of time; live-verified end-to-end with no Ctrl+V needed)
 
 ## Current
 
@@ -350,6 +351,75 @@ same methodology as rounds 5–6.
   has no new pure logic to unit-test (its selectors are DOM lookups already exercised live, and
   it doesn't touch `UPLOAD_INDICATOR_SELECTOR` since the file-attach tier is never reached here).
 
+## Round 8 — Gemini auto-attach, no clipboard paste needed (2026-08-21)
+
+The user tried round 7's clipboard-fallback flow by hand and it worked, but asked to eliminate
+the manual Ctrl+V step entirely. Investigated whether that's possible given round 7's finding
+that Gemini's file input is gated behind a menu only a browser-trusted click can open.
+
+- **The launcher button click is a real trusted click on Gemini's own top-level page** — unlike
+  every other interaction with the board (which happens inside the extension's cross-origin
+  iframe), clicking the ✎ launcher button fires directly on `gemini.google.com` itself. Confirmed
+  live that a synchronous `.click()` on Gemini's "アップロードとツール" toggle, called from
+  *inside* that real click's own handler, does open the menu — the same call from a separate,
+  later script execution does not (this matches the standard browser restriction that only a
+  script running synchronously within a trusted user gesture can trigger this kind of UI).
+- **First design attempt was wrong and caught by live testing, not reasoning**: the first version
+  tried to re-open Gemini's menu on every click *inside the board's iframe* (each draw stroke,
+  each toolbar button), reasoning that the send click itself would need to be one such trusted
+  moment. Live testing disproved the premise directly: a diagnostic listener for click/mousedown/
+  focus/blur on the iframe element, armed before clicking tools inside the actual board, recorded
+  zero events reaching the top-level page for any of them. Cross-origin iframe clicks (the board
+  is `chrome-extension://` inside `https://gemini.google.com`) don't propagate to the parent frame
+  at all — the earlier round-7 observation that a stray open menu "closed after clicking inside
+  the board" had a different, uninvestigated cause, not iframe-click propagation.
+- **Corrected design, verified live**: since iframe interaction is invisible to the top page, and
+  therefore also invisible to Gemini's own document-level "outside click closes the menu"
+  listener, opening the menu *once* — synchronously, inside the launcher button's own trusted
+  click handler, via a new optional `SiteAdapter.prepareForOpen()` hook called from
+  `mount.ts`'s `openOverlay()` — survives the *entire* drawing session untouched. Verified by
+  opening the board, selecting tools, drawing, and sending, all through the real UI, and
+  confirming Gemini's menu (and the file input inside it) was still there when 送信 was pressed.
+- **The specific menu item ("ファイルをアップロード") renders on a delay** after the toggle click
+  — not yet in the DOM at the instant `toggle.click()` returns (confirmed live). Only *opening
+  the toggle menu* needs to be inside the trusted click; clicking the item afterward does not
+  (confirmed live from a separate, later call), because intercepting
+  `HTMLInputElement.prototype.click` replaces the native file-picker-opening call before the
+  browser evaluates trust at all. So `gemini.ts` opens the toggle synchronously, then polls
+  (50ms interval, 2s timeout) for the item to appear before clicking it.
+- **Selector correctness**: replaced the earlier round-7 text-matched selector
+  (`'ファイルをアップロード'`, Japanese-locale-only) with `images-files-uploader
+  button:not([class*="hidden"])` — keyed off the custom element Angular renders for this specific
+  menu item, locale-independent. A tempting-looking sibling,
+  `.hidden-local-file-image-selector-button`, was tried first and confirmed live *not* to trigger
+  the same input — the visible menu item button is the one that actually works.
+- **Full end-to-end live test through the real UI, from a fresh extension reload**: clicked the
+  real launcher button, confirmed the file input existed a moment later (no manual step), drew a
+  text element, pressed 送信, and confirmed the drawing was auto-attached to Gemini's composer —
+  screenshot-verified, composer showed the real thumbnail with no clipboard/paste step at all.
+  Cleaned up the test attachment afterward.
+- **Added a second, generic improvement while here**: `mount.ts`'s clipboard-fallback tier (used
+  by all three sites when a real file input can't be found) now calls
+  `adapter.findComposer()?.focus()` after a successful clipboard write — a real paste keystroke
+  still can't be synthesized by any content script (a hard browser restriction, not
+  site-specific), but placing the cursor for the user means the only action left is the paste
+  itself. This is the automatic degrade path if Gemini's menu-reveal ever stops working (a
+  redesign, an unrelated bug) — `findFileInput()` returning null for any reason still falls
+  through to this tier exactly as before, so the feature degrades to "one keystroke needed"
+  rather than breaking outright.
+- **Accepted, documented risk**: revealing the file input requires clicking Gemini's own
+  "ファイルをアップロード" menu item, which internally opens a native OS file picker unless
+  intercepted — the interception is airtight only because Gemini's internal handler calls it
+  synchronously (confirmed live). If a future Gemini redesign makes that call asynchronous, the
+  interception window would miss it and a real native file-picker dialog could open, blocking the
+  browser tab until the user manually cancels it — this exact failure mode was hit once during
+  testing (chrome-devtools-mcp lost connection to the browser until the user found and cancelled
+  the dialog by hand). The user was informed of this specific risk and chose to accept it in
+  exchange for the eliminated paste step, with the clipboard-fallback degrade path as the safety
+  net if it ever fires for real.
+- `pnpm verify` (lint, typecheck, test, build) passes; no new tests added (all of this round's
+  logic is DOM interaction exercised live, not pure logic with a clean unit boundary).
+
 ## Next
 
 1. Once ChatGPT's upload limit resets, get the user's own logged-in, real-extension confirmation
@@ -361,7 +431,11 @@ same methodology as rounds 5–6.
    change it again.
 3. Get the user's own manual, packaged-extension confirmation for gemini.google.com too, same
    shape as the claude.ai round-6 test — this round's live verification was thorough but was
-   still driven through `chrome-devtools-mcp`, not a fully independent user pass.
+   still driven through `chrome-devtools-mcp`, not a fully independent user pass. Specifically
+   worth another look on a normal day-to-day session: does the auto-attach still fire reliably on
+   the very first send of a fresh session, and does Gemini ever visibly flash the upload menu open
+   (it's expected to stay hidden under the board overlay, but only confirmed via screenshot a
+   handful of times so far)?
 
 ## Verification status
 
@@ -396,6 +470,15 @@ same methodology as rounds 5–6.
   relies on the existing clipboard-fallback tier — confirmed working via a real Ctrl+V paste, and
   then confirmed again through the actual board UI end-to-end (draw → 送信 → auto-close → paste
   → real thumbnail attached, then cleaned up).
+- Round 8 (2026-08-21) eliminated that clipboard-paste step entirely: the launcher button's own
+  trusted click is spent to reveal Gemini's menu-gated file input ahead of time
+  (`SiteAdapter.prepareForOpen`), which then survives the whole drawing session since board-iframe
+  clicks never reach the top-level page (confirmed live via a diagnostic listener that recorded
+  zero events for any interaction inside the board). Confirmed end-to-end through the real UI from
+  a fresh extension reload: launcher click → draw → 送信 → auto-attached with no Ctrl+V. Also hit,
+  live, the accepted risk this design carries — chrome-devtools-mcp lost the browser connection
+  once during testing, consistent with a real native file-picker dialog opening and blocking the
+  tab, resolved by the user cancelling it by hand.
 
 ## Known assumptions
 
