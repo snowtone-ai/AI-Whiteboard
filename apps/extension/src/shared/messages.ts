@@ -15,7 +15,7 @@ export interface ClosePayload {
 
 export type BoardToHostMessage = SendPayload | ClosePayload
 
-export type InsertOutcome = 'attached' | 'clipboard-fallback' | 'failed'
+export type InsertOutcome = 'attached' | 'attached-unconfirmed' | 'clipboard-fallback' | 'failed'
 
 export interface ResultPayload {
   type: 'ai-whiteboard:result'

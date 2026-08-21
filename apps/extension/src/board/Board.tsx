@@ -82,25 +82,50 @@ export function Board() {
   }, [postToHost])
 
   useEffect(() => {
+    let autoCloseTimer: ReturnType<typeof setTimeout> | undefined
+
+    function scheduleAutoClose(delayMs: number): void {
+      clearTimeout(autoCloseTimer)
+      autoCloseTimer = setTimeout(handleClose, delayMs)
+    }
+
     function onMessage(event: MessageEvent<HostToBoardMessage>) {
       const hostOrigin = hostOriginRef.current
       if (!hostOrigin || event.origin !== hostOrigin || event.source !== window.parent) return
       const message = event.data
       if (!message || message.type !== 'ai-whiteboard:result') return
+
+      // This panel covers nearly the whole viewport (see mount.ts), which
+      // hides the host page's own composer and send button behind it. Once
+      // there's nothing more for the user to do *here*, the panel closes
+      // itself on a short delay (long enough to read the message) so the
+      // real composer becomes reachable — this only dismisses our own
+      // overlay, it never presses the host's send button (see D-013).
       if (message.outcome === 'attached') {
         setStatus({
           kind: 'done',
-          text: '送信欄に添付しました。画像の読み込み表示が消えて（アップロード完了）から送信してください。',
+          text: 'アップロード完了を確認しました。画面を閉じています…実際の送信欄の送信ボタンを押してください。',
         })
+        scheduleAutoClose(1200)
+      } else if (message.outcome === 'attached-unconfirmed') {
+        setStatus({
+          kind: 'done',
+          text: '送信欄に添付しましたが、アップロード完了は確認できませんでした。画面を閉じています…画像の読み込み表示が消えたことを目視で確認してから送信してください。',
+        })
+        scheduleAutoClose(1800)
       } else if (message.outcome === 'clipboard-fallback') {
-        setStatus({ kind: 'done', text: '画像をコピーしました。入力欄で Ctrl+V を押して貼り付けてください。' })
+        setStatus({ kind: 'done', text: '画像をコピーしました。画面を閉じています…入力欄で Ctrl+V を押して貼り付けてください。' })
+        scheduleAutoClose(1800)
       } else {
         setStatus({ kind: 'error', text: '送信に失敗しました。入力欄をクリックしてから、もう一度お試しください。' })
       }
     }
     window.addEventListener('message', onMessage)
-    return () => window.removeEventListener('message', onMessage)
-  }, [])
+    return () => {
+      window.removeEventListener('message', onMessage)
+      clearTimeout(autoCloseTimer)
+    }
+  }, [handleClose])
 
   return (
     <div className="board-shell">

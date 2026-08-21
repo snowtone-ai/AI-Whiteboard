@@ -22,10 +22,16 @@ weeks as unverified.
      - attaches the image to the composer and inserts the ordered text description, or
      - falls back to "copied to clipboard" with a visible message, and Ctrl+V in the composer
        actually pastes the image.
-   - [ ] After attach, wait for the upload-in-progress indicator on the thumbnail to clear
-         before pressing the site's send button, then confirm the image actually reaches the AI
-         (not just a thumbnail in the composer) — the extension only waits 1200ms before
-         reporting success, which is a best-effort delay, not a guarantee the upload finished.
+   - [ ] After attach, the board panel should auto-close within ~1-2 seconds, revealing the real
+         composer. Confirm the status message shown just before closing is accurate: "アップロード
+         完了を確認しました" should mean the thumbnail's loading indicator is actually gone by
+         then; "アップロード完了は確認できませんでした" (attached-unconfirmed) means our generic
+         indicator heuristic (`waitForUploadSettle` in `apps/extension/src/content/insert/
+         waitForUploadSettle.ts`) never saw the busy state clear within 8s — check by eye whether
+         that matches reality, since this heuristic has not been confirmed against chatgpt.com's
+         actual markup yet.
+   - [ ] Confirm the image actually reaches the AI (not just a thumbnail in the composer) once
+         you press the site's own send button after the panel closes.
    - [ ] Nothing is auto-submitted — the message stays in the composer until the site's own
          send button is pressed by hand.
    - [ ] No uncaught errors appear in the page's DevTools console attributable to the extension.

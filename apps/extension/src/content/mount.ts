@@ -1,6 +1,7 @@
 import type { BoardToHostMessage, HostToBoardMessage, InsertOutcome } from '../shared/messages'
 import { attachImageFile } from './insert/attachFile'
 import { insertTextIntoComposer } from './insert/insertText'
+import { UPLOAD_INDICATOR_SELECTOR, waitForUploadSettle } from './insert/waitForUploadSettle'
 import type { SiteAdapter } from './adapters/types'
 
 const HOST_ID = 'ai-whiteboard-host'
@@ -174,12 +175,15 @@ export function mountLauncher(adapter: SiteAdapter): void {
       if (attached) {
         // Dispatching 'change' only starts the site's own upload of the
         // file to its backend — it does not mean the upload is finished.
-        // There is no reliable, non-fragile way to detect "upload done" from
-        // outside the site's own UI, so the board's success message tells
-        // the user to wait for the preview to finish loading before
-        // pressing send, rather than implying it's safe to send immediately.
-        await new Promise((resolve) => setTimeout(resolve, 1200))
-        return 'attached'
+        // waitForUploadSettle polls a generic, site-agnostic "does a
+        // progress/spinner/busy-looking element still exist" predicate
+        // scoped to the composer's form (falling back to the whole document
+        // if the file input isn't inside a <form>) instead of a blind fixed
+        // delay, so a genuinely slow upload gets more time and a fast one
+        // doesn't force the user to wait longer than necessary.
+        const scope = fileInput.closest('form') ?? document.body
+        const settle = await waitForUploadSettle(() => !!scope.querySelector(UPLOAD_INDICATOR_SELECTOR))
+        return settle === 'timeout' ? 'attached-unconfirmed' : 'attached'
       }
     }
 

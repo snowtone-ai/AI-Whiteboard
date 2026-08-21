@@ -1,7 +1,7 @@
 # state.md — current project state
 
-Updated: 2026-08-21 (round 2: fullscreen board, i18n, button position, summary length cap,
-upload-timing fix)
+Updated: 2026-08-21 (round 3: overlay auto-close, generic upload-settle detection, empirical
+check of whether the text summary adds value beyond the image)
 
 ## Current
 
@@ -77,11 +77,67 @@ Two more issues raised in the same follow-up, also addressed:
   and text on a white background, exactly what PNG (lossless, sharp edges, no JPEG ringing
   around text/lines) is suited for. No format change made.
 
+## Round 3 fixes (user reported round 2's mitigation still didn't fix "image not reaching the AI")
+
+Investigated further without a live chatgpt.com session available (`chrome-devtools` MCP had no
+logged-in tab open — confirmed via `list_pages`, only `about:blank`), so this is two structural
+fixes derived from reading our own code plus research, not a live-verified root cause:
+
+- **The board panel itself hides the real send button.** `mount.ts` sizes the panel to
+  `96vw × 92vh` — nearly the whole viewport. The user's own screenshot shows the panel still
+  open after pressing the board's "送信" (attach) button, which structurally means ChatGPT's own
+  composer and send button were not reachable underneath it. Very plausible primary cause: not
+  a failed attach, but the user being unable to see/reach the real send button afterward.
+  **Fix**: the board now auto-closes itself (`Board.tsx`) a short delay after a successful
+  attach/clipboard-fallback result, so the real composer becomes visible. This dismisses only
+  our own overlay — it never touches or presses the host's own send button (D-013 unaffected).
+- **The fixed 1200ms wait was a blind guess.** Replaced with `waitForUploadSettle`
+  (`apps/extension/src/content/insert/waitForUploadSettle.ts`, unit-tested): polls a generic,
+  site-agnostic "does anything that looks like a progress/spinner/busy indicator still exist
+  inside the composer's form" predicate instead of a fixed sleep. Reports one of `settled`
+  (saw an indicator, then it cleared — strongest signal), `timeout` (still busy after 8s — real
+  signal something is stuck/slow), or `no-indicator` (nothing matched either way — no
+  information). `timeout` now surfaces as a distinct `attached-unconfirmed` outcome with an
+  honest "could not confirm" message, instead of silently claiming success. This is a generic
+  heuristic (case-insensitive substring match on `role`/`class`/`aria-busy`), not hardcoded to
+  chatgpt.com's exact markup, specifically so it doesn't silently stop matching after a
+  redesign — but it has **not been confirmed against the real site's actual indicator markup**,
+  since no live session was available this round either.
+
+**Still needs the user's own live-session confirmation** — this round's fixes are structurally
+sound and unit-tested where testable, but neither has been exercised against real chatgpt.com.
+
+## Whether the text summary is actually useful alongside the image (user question, verified)
+
+Built the real production pipeline (`board.js`/`board.css` from an actual `pnpm build`) into a
+throwaway Playwright test harness (temp files under the gitignored `dist/`, deleted after use)
+that embeds the real board in an iframe exactly as `mount.ts` does, drew two rectangles + a bound
+arrow + a text label through the actual UI, pressed the real "送信" button, and inspected both
+the real `summarizeBoard()` output and the real exported PNG side by side.
+
+Result: for that diagram, the PNG alone was already fully unambiguous — the arrow's direction and
+both endpoints were clear from pixels alone, so the text summary line
+(`3. 四角形3（四角形1 → 四角形2）`) told a vision model nothing the image didn't already show.
+This matches external research on redundant text alongside images for vision-language models:
+captions/text help most where content couples visual and symbolic/linguistic features (labeled
+axes, embedded text, ambiguous connections in a complex diagram), and can otherwise compete with
+the image for attention or add nothing (see Sources below). Conclusion: keep the text summary —
+it is cheap and its value scales with diagram complexity/ambiguity, exactly the case where a
+human or AI reader would also struggle from pixels alone — but don't expect it to add value for
+simple, already-legible drawings. No code change was needed for this question; this confirms the
+existing design (PNG as the primary source of truth, text summary as a lightweight supplement)
+rather than motivating a change.
+
+Sources: [Vision Language Model-based Caption Evaluation Method](https://arxiv.org/html/2402.17969v1),
+[Beyond Intermediate States: Explaining Visual Redundancy through Language](https://arxiv.org/pdf/2503.20540)
+
 ## Next
 
 1. Manual smoke test on chatgpt.com with a real logged-in session (cannot be run from this
    environment — see `docs/adapter-smoke.md` for the checklist and record the result there).
-   In particular the upload-timing mitigation above needs a real send-flow check.
+   In particular, confirm whether the board auto-closing and the new `waitForUploadSettle`
+   heuristic actually fix "image not reaching the AI" for real — round 2's fixed-delay mitigation
+   was reported to still fail, and round 3's fixes are unverified against the live site.
 2. Load the unpacked extension (`apps/extension/dist/` after `pnpm build`) via
    `chrome://extensions` → Developer mode → Load unpacked, and confirm the launcher button
    appears, the board opens, and send attaches an image to the composer.
