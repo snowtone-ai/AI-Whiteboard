@@ -1,7 +1,7 @@
 # state.md — current project state
 
-Updated: 2026-08-21 (round 11: fixed a real Gemini clipboard-fallback bug found in the owner's
-live use — a focus-loss regression that silently dropped the paste after closing the panel)
+Updated: 2026-08-21 (round 12: owner reloaded all three site adapters and confirmed each live in
+their own hands — all three phases, P006/P007/P008, are now `verified`)
 
 ## Current
 
@@ -517,19 +517,28 @@ it as a real bug, not just re-verify.
   broke specifically on the close-then-paste sequence a real user actually follows, which is exactly
   why it wasn't caught by round 9's testing (which checked the paste while focus was still fresh).
 
+## Round 12 — all three sites confirmed by the owner's own hands (2026-08-21)
+
+The owner reloaded the packaged extension and checked all three sites themselves after round 11's
+fix. Reported: chatgpt.com and claude.ai OK. For Gemini, asked to confirm whether the new
+"pressing ✕ to dismiss the whiteboard after 送信" step (added by round 11's fix) was the intended
+design rather than a leftover bug — confirmed it is (Gemini has no safe way to auto-attach without
+risking the native file picker, so the manual paste-then-close step is inherent to that tier, not
+an oversight), and the owner accepted that as OK.
+
+- This is the owner's own unpacked-extension, logged-in, own-hands pass for all three adapters —
+  the same bar P007 (claude.ai) reached in round 6. P006 (chatgpt.com) and P008 (gemini.google.com)
+  move from `review` to `verified` in `tasks.md`.
+- No code changed this round — verification and documentation only.
+
 ## Next
 
-1. Get the user's own logged-in, real-extension, own-hands confirmation for all three sites — the
-   same kind of manual test the user already completed for claude.ai in round 6. chatgpt.com's
-   mechanism was confirmed tool-side in round 10, Gemini's clipboard-fallback (including the round
-   11 fix) tool-side in rounds 7/9/11, but none has had the owner's own unpacked-extension pass yet.
-2. Watch for any further chatgpt.com upload-indicator markup drift: if a future redesign changes
+1. Watch for any further chatgpt.com upload-indicator markup drift: if a future redesign changes
    it again, re-capture the real indicator markup (DevTools → inspect the attachment tile while
    uploading) and diff it against `REAL_CHATGPT_UPLOADING_TILE_HTML` in
    `waitForUploadSettle.test.ts`.
-3. Gemini's clipboard-fallback panel now requires a manual close (round 11) instead of auto-closing
-   — worth a real day-to-day session to confirm this doesn't feel like an extra annoying step now
-   that it stays open until dismissed.
+2. No open verification gaps remain across the three supported sites as of round 12. Future work is
+   net-new scope (see `docs/vision.md`/`tasks.md`) rather than closing out P006–P008.
 
 ## Verification status
 
