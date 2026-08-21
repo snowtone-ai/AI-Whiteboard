@@ -1,8 +1,7 @@
 # state.md — current project state
 
-Updated: 2026-08-21 (round 9: reverted round 8's Gemini auto-attach trick — its accepted native-
-file-picker risk materialized in real use, so the interception was removed and Gemini is back on
-the user-verified clipboard-fallback tier only)
+Updated: 2026-08-21 (round 10: closed ChatGPT's login-gated smoke-test gap now that the owner's
+upload limit reset — full flow confirmed live including the model reading the attached image)
 
 ## Current
 
@@ -450,22 +449,49 @@ eliminated.
   claude.ai and chatgpt.com's shared design), but still needs the user's own manual pass with the
   packaged extension before `verified`, same as the other two sites.
 
+## Round 10 — ChatGPT's login-gated smoke-test gap closed (2026-08-21)
+
+Round 4 had confirmed the attach mechanism unauthenticated via Playwright, but the "does the
+image actually reach the model through a real, logged-in account" step was blocked by the owner's
+free-tier upload limit. The owner reported the limit had reset and asked for this to be finished,
+alongside the Gemini fix above (both handled in this session; parallel sub-agents were offered but
+both tasks were small/sequential enough to do directly).
+
+- Reloaded the extension (`chrome://extensions`, dev-reload) so the just-rebuilt `dist/` — including
+  the round 9 Gemini revert — was actually running, then reloaded the owner's existing, authenticated
+  `chatgpt.com` tab via `chrome-devtools-mcp`.
+- Confirmed the launcher button already renders on a real ChatGPT home screen with the owner's own
+  session and chat history. Opened the board, selected the text tool (drag-based tools weren't
+  reliable to drive via the available element-uid drag primitive, which is built for HTML5
+  drag-and-drop, not freehand canvas strokes — text avoided that entirely), placed "ChatGPT smoke
+  test" on the canvas, and pressed 送信.
+- The panel auto-closed with "アップロード完了を確認しました" and a real `whiteboard.png` thumbnail
+  was attached in the composer (confirmed via the accessibility snapshot showing "ファイル 1 を削除：
+  whiteboard.png", not just a visual thumbnail). Pressed ChatGPT's own send button (the extension
+  never does this itself, per D-013) and the model replied "画像を確認しました。「ChatGPT smoke
+  test」と手書きされた画像です。" — direct confirmation that the backend upload succeeded and the
+  model actually read the handwritten content, not just that a thumbnail rendered locally.
+- Deleted the test conversation afterward as cleanup (same convention as prior rounds).
+- P006 moves from `review` (partial) to `review` (complete mechanism, pending owner's-own-hands
+  pass) — this was tool-driven via `chrome-devtools-mcp`, not the owner manually loading the
+  unpacked extension themselves, so it stays short of `verified` for the same reason claude.ai
+  needed its own round 6 and Gemini still needs one. All three site adapters are now at that same
+  single remaining gap.
+- `pnpm verify` unaffected (no code changed this round, verification only).
+
 ## Next
 
-1. Once ChatGPT's upload limit resets, get the user's own logged-in, real-extension confirmation
-   for chatgpt.com per `docs/adapter-smoke.md` — the same kind of manual test the user already
-   completed successfully for claude.ai in round 6, still outstanding for ChatGPT.
-2. If chatgpt.com's fix does *not* fully resolve it, re-capture its real indicator markup
-   (DevTools → inspect the attachment tile while it's uploading) and diff it against
-   `REAL_CHATGPT_UPLOADING_TILE_HTML` in `waitForUploadSettle.test.ts` — a further redesign could
-   change it again.
-3. Get the user's own manual, packaged-extension confirmation for gemini.google.com too, same
-   shape as the claude.ai round-6 test — this round's live verification was thorough but was
-   still driven through `chrome-devtools-mcp`, not a fully independent user pass. Specifically
-   worth another look on a normal day-to-day session: does the auto-attach still fire reliably on
-   the very first send of a fresh session, and does Gemini ever visibly flash the upload menu open
-   (it's expected to stay hidden under the board overlay, but only confirmed via screenshot a
-   handful of times so far)?
+1. Get the user's own logged-in, real-extension, own-hands confirmation for all three sites — the
+   same kind of manual test the user already completed for claude.ai in round 6. chatgpt.com's
+   mechanism was confirmed tool-side in round 10, Gemini's clipboard-fallback in rounds 7/9, but
+   neither has had the owner's own unpacked-extension pass yet.
+2. Watch for any further chatgpt.com upload-indicator markup drift: if a future redesign changes
+   it again, re-capture the real indicator markup (DevTools → inspect the attachment tile while
+   uploading) and diff it against `REAL_CHATGPT_UPLOADING_TILE_HTML` in
+   `waitForUploadSettle.test.ts`.
+3. Gemini is back on clipboard-fallback only after round 9's revert — worth confirming on a normal
+   day-to-day session that the fallback message and auto-focus are clear enough that the paste
+   step doesn't feel broken, since the smoother auto-attach experiment didn't survive.
 
 ## Verification status
 
