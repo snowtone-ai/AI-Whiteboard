@@ -112,8 +112,17 @@ export function Board() {
         })
         scheduleAutoClose(1800)
       } else if (message.outcome === 'clipboard-fallback') {
-        setStatus({ kind: 'done', text: '画像をコピーしました。画面を閉じています…入力欄で Ctrl+V を押して貼り付けてください。' })
-        scheduleAutoClose(1800)
+        // Unlike the other outcomes, there is a real action still pending on
+        // the user here (the paste keystroke itself can't be synthesized —
+        // see mount.ts). Auto-closing on a timer risked the panel vanishing
+        // before the user had actually pasted, silently discarding their
+        // drawing with no visible sign anything was wrong (D-014 round 11).
+        // This outcome is the one case that stays open until the user
+        // dismisses it themselves, once they've confirmed the paste worked.
+        setStatus({
+          kind: 'done',
+          text: '画像をコピーしました。入力欄をクリックして Ctrl+V で貼り付け、貼り付けを確認してから ✕ でこの画面を閉じ、実際の送信ボタンを押してください。',
+        })
       } else {
         setStatus({ kind: 'error', text: '送信に失敗しました。入力欄をクリックしてから、もう一度お試しください。' })
       }

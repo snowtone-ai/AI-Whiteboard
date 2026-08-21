@@ -153,6 +153,15 @@ export function mountLauncher(adapter: SiteAdapter): void {
   function closeOverlay(): void {
     if (overlay) overlay.style.display = 'none'
     document.removeEventListener('keydown', onEscape)
+    // Closing via the panel's own "✕"/Escape moves DOM focus onto that
+    // control, which lives inside the iframe — even after the overlay is
+    // hidden, focus does not automatically return to the host page. For the
+    // clipboard-fallback outcome the whole point of focusing the composer in
+    // runInsertionLadder was so the user's very next keystroke (Ctrl+V)
+    // lands there; losing that focus on close silently swallows the paste
+    // with no visible error (found live testing Gemini's fallback flow).
+    // Re-focusing on every close is harmless for the other outcomes too.
+    adapter.findComposer()?.focus()
   }
 
   function onEscape(event: KeyboardEvent): void {

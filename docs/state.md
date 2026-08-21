@@ -1,7 +1,7 @@
 # state.md — current project state
 
-Updated: 2026-08-21 (round 10: closed ChatGPT's login-gated smoke-test gap now that the owner's
-upload limit reset — full flow confirmed live including the model reading the attached image)
+Updated: 2026-08-21 (round 11: fixed a real Gemini clipboard-fallback bug found in the owner's
+live use — a focus-loss regression that silently dropped the paste after closing the panel)
 
 ## Current
 
@@ -479,19 +479,57 @@ both tasks were small/sequential enough to do directly).
   single remaining gap.
 - `pnpm verify` unaffected (no code changed this round, verification only).
 
+## Round 11 — Gemini clipboard-fallback paste silently dropped after closing the panel (2026-08-21)
+
+The owner reloaded all three site adapters after round 10 and reported: chatgpt.com and claude.ai
+were fine, but on Gemini "送信 in the whiteboard did nothing — nothing got attached." Asked to fix
+it as a real bug, not just re-verify.
+
+- Reproduced live via `chrome-devtools-mcp` against the owner's authenticated `gemini.google.com`
+  session. First confirmed the round 9 clipboard-fallback mechanism itself still worked correctly
+  in isolation (clipboard write succeeds, composer gets focus, a plain Ctrl+V pastes fine) — so the
+  underlying attach path was not broken.
+- Also re-confirmed there is still no safe programmatic path around Gemini's native file picker:
+  opening the "アップロードとツール" menu does not instantiate the named file input ahead of a click
+  on "ファイルをアップロード" (it only appears at the moment of that click, which is also what opens
+  the native dialog), and a synthetic `drop` DragEvent with a constructed `DataTransfer` is silently
+  ignored (browsers don't let untrusted drag events carry real files to a page's drop handler).
+  Confirms round 9's revert was the right call, not something to re-attempt.
+- Found the actual bug: `Board.tsx`'s clipboard-fallback message auto-closed the panel on a timer,
+  same as the other outcomes. But unlike `attached`/`attached-unconfirmed` — where nothing further
+  is needed from the user except pressing the site's own send button — clipboard-fallback still has
+  a real pending action (the Ctrl+V itself), and the auto-close timer could dismiss the panel before
+  the owner had actually pasted, discarding the drawing with no visible sign anything went wrong.
+  Fixed by not auto-closing that outcome at all; the panel now stays open with a message that spells
+  out click → Ctrl+V → confirm the paste → close with ✕ → press the real send button, and the user
+  dismisses it themselves once done (`Board.tsx`).
+- That surfaced a second, sharper bug while testing the fix live: closing the panel via its own ✕
+  button (now the only way to close on this outcome) moves DOM focus onto that button, which lives
+  inside the board's iframe. Hiding the overlay afterward does not return focus to the host page —
+  so the composer that `runInsertionLadder` had focused earlier loses it again, and a subsequent
+  Ctrl+V silently pastes nowhere. Reproduced this directly (paste did nothing after clicking ✕) and
+  fixed it by re-focusing `adapter.findComposer()` inside `closeOverlay()` itself, so focus is
+  restored to the host composer on every close, not just at send time (`mount.ts`). Re-verified live
+  after this fix: draw → 送信 → panel stays open → click ✕ → Ctrl+V → image pasted into Gemini's
+  real composer, confirmed by screenshot.
+- `pnpm verify` passes (lint, typecheck, 22 tests, build) after both edits.
+- This was a real, live-use bug, not a flaky one-off: the mechanism worked in isolated testing but
+  broke specifically on the close-then-paste sequence a real user actually follows, which is exactly
+  why it wasn't caught by round 9's testing (which checked the paste while focus was still fresh).
+
 ## Next
 
 1. Get the user's own logged-in, real-extension, own-hands confirmation for all three sites — the
    same kind of manual test the user already completed for claude.ai in round 6. chatgpt.com's
-   mechanism was confirmed tool-side in round 10, Gemini's clipboard-fallback in rounds 7/9, but
-   neither has had the owner's own unpacked-extension pass yet.
+   mechanism was confirmed tool-side in round 10, Gemini's clipboard-fallback (including the round
+   11 fix) tool-side in rounds 7/9/11, but none has had the owner's own unpacked-extension pass yet.
 2. Watch for any further chatgpt.com upload-indicator markup drift: if a future redesign changes
    it again, re-capture the real indicator markup (DevTools → inspect the attachment tile while
    uploading) and diff it against `REAL_CHATGPT_UPLOADING_TILE_HTML` in
    `waitForUploadSettle.test.ts`.
-3. Gemini is back on clipboard-fallback only after round 9's revert — worth confirming on a normal
-   day-to-day session that the fallback message and auto-focus are clear enough that the paste
-   step doesn't feel broken, since the smoother auto-attach experiment didn't survive.
+3. Gemini's clipboard-fallback panel now requires a manual close (round 11) instead of auto-closing
+   — worth a real day-to-day session to confirm this doesn't feel like an extra annoying step now
+   that it stays open until dismissed.
 
 ## Verification status
 
