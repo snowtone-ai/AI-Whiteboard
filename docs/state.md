@@ -209,24 +209,84 @@ fix the actual bug:
   defect that was silently corrupting the "is it safe to send yet" signal on the real site is now
   identified, fixed, and covered by a test, not just re-guessed a third time.
 
+## Round 5 — Claude adapter built and verified live against the user's own authenticated claude.ai (2026-08-21)
+
+ChatGPT's free-tier upload limit blocked further chatgpt.com testing (~3h cooldown), so the user
+redirected: build and verify the Claude adapter next, using their own already-open, already
+logged-in Chrome. `chrome-devtools-mcp` was reconfigured with `--autoConnect` (`.mcp.json`) and
+reconnected via `/mcp`, which connects to the real running Chrome through the
+`chrome://inspect/#remote-debugging` toggle (port 9222) — a different protocol from classic CDP's
+`/json/version` HTTP discovery surface, which that toggle does not serve. This is the first round
+in this project able to drive a real, authenticated site session directly.
+
+- **Method**: with the real claude.ai tab selected, used `evaluate_script` to inspect the live,
+  authenticated composer DOM directly (a11y snapshot first, then targeted `querySelector` probes)
+  — not a fresh unauthenticated instance (claude.ai's login is bot-detection-gated; the user's own
+  session sidesteps that entirely).
+- **Composer structure found**: claude.ai's composer is a tiptap/ProseMirror `contenteditable`
+  div at `[data-testid="chat-input"]`, with no `<form>` ancestor (unlike ChatGPT's composer,
+  which sits inside one). The hidden file input is `input[data-testid="file-upload"]`
+  (`id="chat-input-file-upload-onpage"`, `multiple`, `accept=""`). Attach-menu button:
+  `[data-testid="chat-input-attach"]`. Send button: `[data-testid="chat-input-send"]`. A
+  `<fieldset>` a few levels above the composer wraps the whole input bar and is a stable anchor
+  point for the launcher button.
+- **The same `DataTransfer` + dispatched `change` event attach technique used for ChatGPT works
+  unmodified on claude.ai** — tested live with real PNGs (a 62-byte 1×1 test image, then a
+  ~3.5MB canvas-generated image closer to a real whiteboard export). The file input accepted it,
+  claude.ai's own React code rendered a real thumbnail, and — stronger confirmation than was
+  possible on chatgpt.com — the thumbnail's `<img>` `src` became a real backend URL
+  (`/api/<org>/files/<id>/preview`), proving the authenticated upload actually completed
+  server-side, not just a client-side preview. (Test attachments were deleted afterward via their
+  own delete button so nothing was left in the user's real chat.)
+- **Found and fixed the same class of bug as round 4, on a different site**: `UPLOAD_INDICATOR_SELECTOR`
+  did not match claude.ai's busy state either. Captured live: while an upload is in flight,
+  claude.ai's thumbnail `<img>` carries a Tailwind `animate-pulse` class, dropped once the real
+  file URL loads — the old selector's "progress"/"spinner"/"loading"/"cursor-wait" substrings and
+  `circle[stroke-dashoffset]` all miss it. Fixed by adding `[class*="pulse" i]`. Explicitly did
+  **not** add `[role="status"]`, even though claude.ai's initial upload skeleton also uses it —
+  live-checked and confirmed claude.ai keeps 7 unrelated `role="status"` live-region elements in
+  the DOM at rest, which would make `hasIndicator()` return true permanently and break `'settled'`
+  detection outright (worse than the miss it would fix). Added regression tests
+  (`waitForUploadSettle.test.ts`) using the real captured claude.ai markup, including a dedicated
+  test locking in the "ignore `role=\"status\"`" decision so it can't be silently reverted later.
+- **Built the adapter**: `apps/extension/src/content/adapters/claude.ts`, following the same
+  cascade-from-specific-to-generic pattern as `chatgpt.ts`. `manifest.json` extended explicitly
+  (`content_scripts.matches`, `web_accessible_resources.matches`, `host_permissions` all gained
+  `https://claude.ai/*`) — no wildcard. `content/index.ts` now selects an adapter by
+  `window.location.hostname` instead of hardcoding ChatGPT's.
+- **Incidental fix**: `scripts/verify.mjs`'s design-token lint flagged the verbatim claude.ai
+  markup embedded in the new test fixtures (raw `120px` values from claude.ai's own CSS, not this
+  project's design system) as unregistered design values. Excluded `*.test.ts`/`*.test.tsx` from
+  that check's diff scope — test fixtures capturing third-party markup for regression testing are
+  categorically not this project's UI code.
+- **Still not fully closed**: everything above was done via direct DOM script evaluation against
+  the real authenticated tab, which proves the *mechanism* end-to-end including a real backend
+  upload — but not the packaged extension's content script itself running in its own isolated
+  world against this site (no way to script Chrome's native "Load unpacked" folder picker into
+  the user's already-running browser via CDP). A real logged-in run with the actual built
+  extension loaded (`chrome://extensions` → load unpacked → `apps/extension/dist/`) is the one
+  remaining gap, same shape as chatgpt.com's.
+
 ## Next
 
-1. Manual smoke test on chatgpt.com with a real, logged-in Chrome session — the one remaining
-   gap round 4 could not close from this environment (see `docs/adapter-smoke.md` for the
-   checklist, record the result there). Round 4 verified the client-side attach and indicator
-   mechanism end-to-end against the live site unauthenticated and fixed a real defect in it, but
-   only a logged-in run can confirm the image actually reaches the model.
-2. If the round-4 fix does *not* fully resolve it for the user, the next place to look is the
-   `apps/extension/src/content/insert/waitForUploadSettle.test.ts` fixture: capture the real
-   indicator markup again (DevTools → inspect the attachment tile while it's uploading) and diff
-   it against `REAL_CHATGPT_UPLOADING_TILE_HTML` — a further redesign could change it again.
-3. Claude adapter, then Gemini adapter, each as its own reviewable change — see `tasks.md`.
+1. Once ChatGPT's upload limit resets, get the user's own logged-in confirmation for chatgpt.com
+   per `docs/adapter-smoke.md` — round 4's fix has not yet been confirmed by an authenticated run.
+2. Real logged-in extension-load smoke test for claude.ai too (see Round 5's last point) — load
+   `apps/extension/dist/` as an unpacked extension in a real Chrome profile and run the full
+   draw → 送信 → attach → auto-close flow through the actual content script, not simulated DOM
+   calls.
+3. If either site's fix does *not* fully resolve it, re-capture that site's real indicator markup
+   (DevTools → inspect the attachment tile while it's uploading) and diff it against the relevant
+   fixture in `waitForUploadSettle.test.ts` — a further redesign could change it again.
+4. Gemini adapter next, as its own reviewable change — see `tasks.md`.
 
 ## Verification status
 
-- `pnpm verify` (lint, typecheck, test, build) passes locally: 19 tests (6 for
-  `waitForUploadSettle`, 13 existing in `packages/core`), clean lint/typecheck, extension bundle
-  builds (`content.js` ~5KB, `board.js` ~8MB minified — Excalidraw + React bundled once).
+- `pnpm verify` (lint, typecheck, test, build) passes locally: 22 tests (9 for
+  `waitForUploadSettle` — 4 polling-logic + 5 selector-fixture, covering both chatgpt.com and
+  claude.ai's real captured markup — 13 existing in `packages/core`), clean lint/typecheck,
+  extension bundle builds (`content.js` ~6KB, `board.js` ~8MB minified — Excalidraw + React
+  bundled once).
 - Round 4 (2026-08-21) ran the real built extension against live `https://chatgpt.com/` via a
   Playwright-launched Chromium with `--load-extension`, unauthenticated. Confirmed live: the
   launcher mounts, the board opens, `findComposer`/`findFileInput` resolve to the real
@@ -234,6 +294,11 @@ fix the actual bug:
   (real thumbnail rendered), and the board auto-closes after `waitForUploadSettle` resolves. Not
   confirmed: the authenticated backend upload succeeding and the image reaching the model — that
   requires the user's own logged-in session (see `docs/adapter-smoke.md`).
+- Round 5 (2026-08-21) drove the real, authenticated claude.ai session directly (the user's own
+  logged-in Chrome, via `chrome-devtools-mcp --autoConnect`). Confirmed live, with a real backend
+  response: the attach mechanism, the composer/file-input selectors now in `claude.ts`, and (after
+  the fix) accurate upload-settle detection. Not confirmed: the packaged extension's own content
+  script running against this site (see Round 5's last point above).
 
 ## Known assumptions
 

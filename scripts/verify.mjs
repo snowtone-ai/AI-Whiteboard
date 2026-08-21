@@ -67,10 +67,25 @@ function changedFrontendLines() {
     const exists = spawnSync('git', ['rev-parse', '--verify', remoteBase], { stdio: 'ignore', shell: false })
     baseRef = exists.status === 0 ? `${remoteBase}...HEAD` : 'HEAD^'
   }
-  const result = spawnSync('git', ['diff', '--unified=0', baseRef, '--', 'apps/extension', 'packages'], {
-    encoding: 'utf8',
-    shell: false,
-  })
+  // *.test.ts(x) is excluded: this check exists to catch hand-authored
+  // design values in our own UI code, and test files sometimes embed
+  // verbatim third-party markup (see waitForUploadSettle.test.ts) as
+  // regression fixtures — that markup's px/color values belong to the site
+  // being captured, not our design system, and will never be in DESIGN.md.
+  const result = spawnSync(
+    'git',
+    [
+      'diff',
+      '--unified=0',
+      baseRef,
+      '--',
+      'apps/extension',
+      'packages',
+      ':(exclude)**/*.test.ts',
+      ':(exclude)**/*.test.tsx',
+    ],
+    { encoding: 'utf8', shell: false },
+  )
   if (result.status !== 0) {
     failures.push('design-token-lint-diff')
     return []

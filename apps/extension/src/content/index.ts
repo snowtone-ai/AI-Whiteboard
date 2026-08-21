@@ -1,5 +1,13 @@
 import { chatgptAdapter } from './adapters/chatgpt'
+import { claudeAdapter } from './adapters/claude'
+import type { SiteAdapter } from './adapters/types'
 import { mountLauncher } from './mount'
+
+function selectAdapter(hostname: string): SiteAdapter | null {
+  if (hostname === 'chatgpt.com' || hostname === 'chat.openai.com') return chatgptAdapter
+  if (hostname === 'claude.ai') return claudeAdapter
+  return null
+}
 
 /**
  * A content script runs on every page load of every matched URL, so an
@@ -8,7 +16,8 @@ import { mountLauncher } from './mount'
  * Nothing past this boundary is allowed to throw uncaught.
  */
 try {
-  mountLauncher(chatgptAdapter)
+  const adapter = selectAdapter(window.location.hostname)
+  if (adapter) mountLauncher(adapter)
 } catch (error) {
   console.error('[ai-whiteboard] failed to initialize', error)
 }

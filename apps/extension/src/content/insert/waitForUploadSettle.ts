@@ -63,6 +63,15 @@ export async function waitForUploadSettle(
  * a `cursor-wait` class, and matches none of "progress"/"spinner"/
  * "loading" — so every real attach on this site was silently falling
  * through to 'no-indicator' instead of ever observing the busy state.
+ *
+ * `pulse` was added after the same kind of live check against claude.ai:
+ * its file-thumbnail image carries a Tailwind `animate-pulse` class while
+ * the upload is in flight and drops it once the real file URL loads.
+ * `[role="status"]` was deliberately NOT added even though claude.ai's
+ * initial skeleton also uses it — claude.ai keeps several unrelated
+ * `role="status"` live-region elements in the DOM at rest, so that would
+ * make `hasIndicator()` return true permanently and break 'settled'
+ * detection outright instead of just missing a signal.
  */
 export const UPLOAD_INDICATOR_SELECTOR =
-  '[role="progressbar"], [aria-busy="true"], [class*="progress" i], [class*="spinner" i], [class*="loading" i], [class*="cursor-wait" i], circle[stroke-dashoffset]'
+  '[role="progressbar"], [aria-busy="true"], [class*="progress" i], [class*="spinner" i], [class*="loading" i], [class*="cursor-wait" i], [class*="pulse" i], circle[stroke-dashoffset]'

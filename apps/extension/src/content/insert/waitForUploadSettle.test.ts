@@ -31,6 +31,33 @@ const REAL_CHATGPT_UPLOADING_TILE_HTML = `
 </div>
 `
 
+/**
+ * Captured verbatim from a live, authenticated chrome-devtools-mcp session
+ * against claude.ai's real composer while an attached file was still
+ * uploading (see docs/state.md). claude.ai's "uploading" signal is a
+ * Tailwind `animate-pulse` class on the thumbnail `<img>`, dropped once the
+ * real `/api/.../files/.../preview` URL loads.
+ */
+const REAL_CLAUDE_UPLOADING_TILE_HTML = `
+<div class="relative group/thumbnail" data-testid="file-thumbnail">
+  <div class="rounded-lg overflow-hidden can-focus-within rounded-lg border-0.5 border-strong hover:border-stronger hover:shadow-black/10 shadow-sm shadow-black/5 cursor-pointer" style="width: 120px; height: 120px; min-width: 120px; min-height: 120px;">
+    <button type="button" class="relative bg-bg-000" style="width: 120px; height: 120px;">
+      <img class="w-full h-full object-contain transition duration-400 opacity-100 animate-pulse" alt="whiteboard.png" src="blob:https://claude.ai/ceb2c792-a9c2-4291-b0b4-98da34e6a1fa">
+    </button>
+  </div>
+</div>
+`
+
+const REAL_CLAUDE_SETTLED_TILE_HTML = `
+<div class="relative group/thumbnail" data-testid="file-thumbnail">
+  <div class="rounded-lg overflow-hidden can-focus-within rounded-lg border-0.5 border-strong hover:border-stronger hover:shadow-black/10 shadow-sm shadow-black/5 cursor-pointer" style="width: 120px; height: 120px; min-width: 120px; min-height: 120px;">
+    <button type="button" class="relative bg-bg-000" style="width: 120px; height: 120px;">
+      <img class="w-full h-full object-contain transition duration-400 opacity-100" alt="whiteboard.png" src="/api/63e00ce2-7424-4f17-9595-2b0782600583/files/b952d5c8-ad54-4d83-bdb2-9381e2517d15/preview">
+    </button>
+  </div>
+</div>
+`
+
 describe('waitForUploadSettle', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -88,6 +115,26 @@ describe('UPLOAD_INDICATOR_SELECTOR', () => {
     document.body.innerHTML = `
       <div class="relative flex group/file-tile" role="group" aria-label="whiteboard.png">
         <img alt="" class="h-full w-full object-cover" src="blob:https://chatgpt.com/settled">
+      </div>
+    `
+    expect(document.querySelector(UPLOAD_INDICATOR_SELECTOR)).toBeNull()
+  })
+
+  it('matches claude.ai\'s real upload-in-progress thumbnail markup', () => {
+    document.body.innerHTML = REAL_CLAUDE_UPLOADING_TILE_HTML
+    expect(document.querySelector(UPLOAD_INDICATOR_SELECTOR)).not.toBeNull()
+  })
+
+  it('stops matching once claude.ai\'s thumbnail settles (animate-pulse dropped)', () => {
+    document.body.innerHTML = REAL_CLAUDE_SETTLED_TILE_HTML
+    expect(document.querySelector(UPLOAD_INDICATOR_SELECTOR)).toBeNull()
+  })
+
+  it('ignores claude.ai\'s always-present role="status" live regions', () => {
+    document.body.innerHTML = `
+      <div class="main">
+        <div role="status" aria-live="polite"></div>
+        <div role="status" aria-live="polite"></div>
       </div>
     `
     expect(document.querySelector(UPLOAD_INDICATOR_SELECTOR)).toBeNull()

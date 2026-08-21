@@ -13,7 +13,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*", "https://claude.ai/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
@@ -21,9 +21,9 @@
   "web_accessible_resources": [
     {
       "resources": ["board.html", "board.js", "board.css", "fonts/*"],
-      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"]
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*", "https://claude.ai/*"]
     }
   ],
   "permissions": ["clipboardWrite"],
-  "host_permissions": ["https://chatgpt.com/*", "https://chat.openai.com/*"]
+  "host_permissions": ["https://chatgpt.com/*", "https://chat.openai.com/*", "https://claude.ai/*"]
 }

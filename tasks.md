@@ -28,7 +28,7 @@ complete · `done` = accepted · `verified` = evidence recorded.
 | P004 | verified | main | P002 | `apps/extension/src/content/` | Launcher button mounts beside ChatGPT's composer, repositions on scroll/resize, opens/closes the board overlay; content script never throws uncaught | code review, `pnpm typecheck`/`pnpm lint` | typecheck/lint clean; live-browser smoke pending |
 | P005 | verified | main | P003,P004 | `apps/extension/src/content/insert/`, `mount.ts` | Board→host messaging is origin-validated both directions; insertion ladder tries file-attach then clipboard fallback, never auto-submits, never reads a response | code review against D-011/D-013 | postMessage targetOrigin/origin checks present; no submit/read code path exists |
 | P006 | review | main | P003,P004,P005 | (none — verification only) | Live ChatGPT smoke test passes the `docs/adapter-smoke.md` checklist | manual, logged-in Chrome session | partially run 2026-08-21: unauthenticated Playwright run against live chatgpt.com confirmed the attach mechanism end-to-end and found/fixed a real `UPLOAD_INDICATOR_SELECTOR` defect (see `docs/state.md` round 4, `docs/adapter-smoke.md`); the login-gated "reaches the model" step still needs the owner's own session |
-| P007 | ready | main | P006 | `apps/extension/manifest.json`, `src/content/adapters/claude.ts` | Claude (claude.ai) adapter added as its own reviewable change; host_permissions extended explicitly | unit tests for any pure logic, manual smoke | — |
+| P007 | review | main | P006 | `apps/extension/manifest.json`, `src/content/adapters/claude.ts` | Claude (claude.ai) adapter added as its own reviewable change; host_permissions extended explicitly | unit tests for any pure logic, manual smoke | `claude.ts` built and wired in (`src/content/index.ts` now selects by hostname); `manifest.json` host_permissions/content_scripts/web_accessible_resources extended explicitly to `https://claude.ai/*`; attach mechanism and a real `UPLOAD_INDICATOR_SELECTOR` defect (missing `animate-pulse`) verified live 2026-08-21 against the user's own authenticated claude.ai session via `chrome-devtools-mcp --autoConnect` (see `docs/state.md` round 5, `docs/adapter-smoke.md`); regression tests added. Not yet run: the packaged extension's own content script loaded as an unpacked extension in a real browser — this round verified via direct DOM script evaluation, not the built `content.js` |
 | P008 | ready | main | P007 | `apps/extension/manifest.json`, `src/content/adapters/gemini.ts` | Gemini (gemini.google.com) adapter added last — most unusual composer of the three | unit tests for any pure logic, manual smoke | — |
 | P009 | verified | main | P002–P005 | `docs/*.md`, `README.md`, `tasks.md` | Docs describe the extension product, not the archived desktop app; decisions D-009–D-013 record the pivot | `git diff --check`, `pnpm verify` | this ledger entry |
 
@@ -41,8 +41,10 @@ part, and a stale date there is a real signal to re-check, not paperwork.
 
 ## Current pointer
 
-`pnpm verify` (lint, typecheck, test, build) passes locally. The one thing this environment
-cannot do is drive a real, logged-in Chrome session against chatgpt.com — P006's live smoke
-test is the next concrete step, to be run by the owner following `docs/adapter-smoke.md`.
-Claude and Gemini adapters (P007/P008) are intentionally sequenced after a working, verified
-ChatGPT flow, not built in parallel with it.
+`pnpm verify` (lint, typecheck, test, build) passes locally; 22 tests. This environment can now
+drive the user's own real, logged-in Chrome via `chrome-devtools-mcp --autoConnect` (see
+`docs/state.md` round 5), which is how P007's claude.ai work was verified live. Two smoke-test
+gaps remain, both needing a real unpacked-extension load in a real profile rather than direct DOM
+scripting: chatgpt.com (P006, blocked ~3h by the owner's free-tier upload limit as of 2026-08-21)
+and claude.ai (P007, mechanism confirmed, packaged content script not yet run). Gemini (P008)
+stays sequenced after those two close out.
