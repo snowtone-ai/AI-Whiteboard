@@ -12,6 +12,12 @@ screenshots/
 .playwright-mcp/
 ai-whiteboard-*.png
 
+# UI tooling is provisioned by scripts/setup.mjs; keep generated skills/hooks out of Git.
+.agents/
+.claude/skills/
+.claude/settings.local.json
+.codex/hooks.json
+
 # Secrets: .env.example is the only env file tracked.
 .env
 .env.*

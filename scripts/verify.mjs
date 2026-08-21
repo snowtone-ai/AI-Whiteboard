@@ -60,6 +60,49 @@ function run(label, command, args) {
   }
 }
 
+function changedFrontendLines() {
+  let baseRef = 'HEAD'
+  if (process.env.GITHUB_BASE_REF) {
+    const remoteBase = `origin/${process.env.GITHUB_BASE_REF}`
+    const exists = spawnSync('git', ['rev-parse', '--verify', remoteBase], { stdio: 'ignore', shell: false })
+    baseRef = exists.status === 0 ? `${remoteBase}...HEAD` : 'HEAD^'
+  }
+  const result = spawnSync('git', ['diff', '--unified=0', baseRef, '--', 'apps/extension', 'packages'], {
+    encoding: 'utf8',
+    shell: false,
+  })
+  if (result.status !== 0) {
+    failures.push('design-token-lint-diff')
+    return []
+  }
+  return result.stdout.split(/\r?\n/).filter((line) => line.startsWith('+') && !line.startsWith('+++'))
+}
+
+function runDesignTokenLint() {
+  if (!fs.existsSync('DESIGN.md')) return
+  const registered = fs.readFileSync('DESIGN.md', 'utf8').match(/`[^`]+`/g)?.map((token) => token.slice(1, -1)) ?? []
+  const allowed = new Set(registered)
+  const violations = []
+
+  for (const line of changedFrontendLines()) {
+    const values = [
+      ...(line.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []),
+      ...(line.match(/\b\d+(?:\.\d+)?(?:px|rem|em|ms)\b/g) ?? []),
+    ]
+    for (const value of values) {
+      if (!allowed.has(value)) violations.push(`${value} in ${line.slice(1).trim()}`)
+    }
+  }
+
+  if (violations.length > 0) {
+    console.error('[verify] unregistered design values in changed frontend files:')
+    for (const violation of violations) console.error(`  ${violation}`)
+    failures.push('design-token-lint')
+  }
+}
+
+runDesignTokenLint()
+
 if (failures.length === 0) {
   run('lint', 'pnpm', ['lint'])
   run('typecheck', 'pnpm', ['typecheck'])

@@ -1,64 +1,70 @@
 # AI Whiteboard
 
-個人・家族向けの、Windowsデスクトップ用ローカルファーストAIホワイトボードです。
-技術設計と教育／STEMの両方を同じキャンバスで扱えます。描画はExcalidraw、AI文脈は
-プロバイダー非依存のAWCP（AI Whiteboard Context Protocol）で表現し、AIによる変更は
-必ず提案として確認してから適用します。
+ChatGPTのチャット入力欄の横にホワイトボードを追加する、Chrome拡張機能です。文章より図で
+伝えたいときに、ボタン一つでホワイトボードを開いて描き、その内容をチャットの入力欄に送れます。
+AIとの会話自体はChatGPT側（ご自身のアカウント・契約）でそのまま行われます。本拡張機能はAI
+プロバイダーのAPIを直接呼び出しません。
 
-## 主な機能
+以前のバージョン（Electronデスクトップアプリ）は`archive/desktop-v1`タグに保存されています。
+現在の設計に至った経緯は[`docs/decisions.md`](docs/decisions.md)のD-009以降を参照してください。
 
-- 手書き、図形、コネクター、テキスト、画像、グループ、Undo/Redoを備えた無限キャンバス
-- セッション検索、ローカル自動保存、原子的保存、バックアップからの起動時復旧、履歴再生
-- 選択範囲、画像、構造化オブジェクト、操作履歴を送信前に選べるContext Lens
-- OpenAI、Anthropic、Google Geminiのストリーミングアダプターと正規化エラー
-- OS暗号化領域（Electron `safeStorage`）に保存するAPIキー
-- 意味オブジェクト／関係／根拠／confidenceを保持するContext Capsule
-- AI編集のプレビュー、出典・モデル・capsule hash表示、適用／却下
-- 日本語音声入力、Quick／Full／Dock／Inspect表示、グローバルショートカット
-- セッション、PNG、SVG、PDF、Markdown、Excalidraw JSON、Context Capsuleの入出力
-- アカウント、バックエンド、クラウド同期、テレメトリーなし
+## 使い方
+
+1. 下記の手順でビルドし、Chromeに読み込む。
+2. chatgpt.comを開く（ログイン状態で）。
+3. 入力欄の横に現れる ✎ ボタンをクリックしてホワイトボードを開く。
+4. 描く。
+5. 「送信」を押す。画像（白背景PNG）と、描いた順番がわかる短いテキスト説明が入力欄に入る。
+6. 内容を確認し、**ChatGPT自身の送信ボタンを押す**。本拡張機能が自動送信することはない。
+
+セレクタが壊れて自動添付ができない場合は、画像をクリップボードにコピーし、
+「Ctrl+Vで貼り付けてください」と表示する（詳細は[`docs/adapter-smoke.md`](docs/adapter-smoke.md)）。
 
 ## 必要環境
 
-- Windows 11
+- Windows 11 + Chrome（Chromium系ブラウザなら動作する可能性が高いが未検証）
 - Node.js 22.12以上
 - pnpm 10.12.1
 
+## ビルドと読み込み
+
 ```powershell
 pnpm install
-pnpm setup
+pnpm run setup
+pnpm build
+```
+
+`apps/extension/dist/`が生成される。Chromeで`chrome://extensions`を開き、デベロッパーモードを
+有効にして「パッケージ化されていない拡張機能を読み込む」から`apps/extension/dist/`を選択する。
+
+開発中はビルドの監視モードが使える。
+
+```powershell
 pnpm dev
 ```
 
-`Ctrl+Shift+Space`でウィンドウを呼び出せます。設定画面で利用するプロバイダーとモデルを
-選び、APIキーを保存してください。キーを設定しなくても描画、保存、履歴、書き出しは
-すべてオフラインで使えます。
-
-## 検証と配布
+## 検証
 
 ```powershell
 pnpm verify
-pnpm dist
 ```
 
-`pnpm verify`は構造チェック、lint、型検査、単体／契約テスト、プロダクションビルドを実行します。
-Windowsインストーラーは`release/AI-Whiteboard-1.0.0-Setup.exe`に生成されます。
+`pnpm verify`はlint、型検査、単体テスト、拡張機能のビルドを実行する。サイトのDOM構造に依存する
+部分（入力欄の検出など）はCIで検証できないため、`docs/adapter-smoke.md`のチェックリストに沿って
+手動で確認し、確認日を記録する運用にしている。
 
 ## データとプライバシー
 
-ボード、スナップショット、イベントはElectronの`userData`配下へ保存されます。APIキーは
-別ファイルへ暗号化して保存され、renderer、ボードJSON、履歴、書き出しには含めません。
-ネットワーク通信はユーザーがAIへ送信したときだけ発生します。送信前にContext Lensで
-対象を確認してください。子どもの個人情報、秘密のコード、認証情報は送信対象から外す運用を
-推奨します。
+APIキーは保存しない（保存する必要がない — AIプロバイダーへの直接アクセスがないため）。通信は
+発生しない。ホワイトボードの内容は拡張機能のiframe内でのみ扱われ、送信先はユーザーが今開いて
+いるChatGPTのページの入力欄のみ。アカウント、バックエンド、テレメトリーはなし。
 
 ## 構成
 
-- `apps/desktop/src/main`: Electron、保存、秘密情報、AIアダプター、IPC
-- `apps/desktop/src/preload`: 最小権限の型付きブリッジ
-- `apps/desktop/src/renderer`: React UI、Excalidraw、Context Lens、提案、履歴、書き出し
-- `packages/core`: AWCP、capsule、semantic extraction、diff／patch／replay、領域、privacy
-- `docs`: ビジョン、意思決定、競合調査、デザイン、実行台帳
+- `apps/extension/src/content/`: ChatGPTのページ上で動くランチャーボタンとDOM挿入処理
+- `apps/extension/src/content/adapters/`: サイトごとのDOM検出（現在ChatGPTのみ）
+- `apps/extension/src/board/`: ホワイトボード本体（`chrome-extension://`ページとして独立実行）
+- `packages/core/`: 旧デスクトップ版のドメインロジック（現在未使用、休眠中）
+- `docs/`: ビジョン、意思決定、アダプター検証ログ、実行台帳
 
-ライセンスはMITです。競合・ライセンス・モデルの調査根拠は
-[`docs/product-research.md`](docs/product-research.md)を参照してください。
+ライセンスはMITです。

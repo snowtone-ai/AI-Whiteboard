@@ -1,10 +1,9 @@
 {
   "name": "ai-whiteboard",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "out/main/index.js",
-  "description": "A local-first personal and family desktop AI whiteboard for technical work and education.",
+  "description": "A Chrome extension that adds a whiteboard input method to ChatGPT (and, in later phases, Claude and Gemini).",
   "author": "snowtone-ai",
   "license": "MIT",
   "packageManager": "pnpm@10.12.1",
@@ -16,42 +15,28 @@
       "lodash-es": "4.18.0",
       "nanoid@<4.0.0": "3.3.18",
       "nanoid@>=4.0.0 <6.0.0": "5.1.16"
-    }
+    },
+    "onlyBuiltDependencies": ["esbuild"]
   },
   "scripts": {
     "setup": "node scripts/setup.mjs",
-    "dev": "pnpm --filter @ai-whiteboard/desktop dev",
+    "dev": "pnpm --filter @ai-whiteboard/extension dev",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "build": "electron-vite build",
-    "dist": "pnpm build && electron-builder --config electron-builder.yml",
+    "build": "pnpm --filter @ai-whiteboard/extension build",
     "verify": "node scripts/verify.mjs"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.65.0",
-    "@excalidraw/excalidraw": "^0.18.0",
-    "@google/genai": "^1.30.0",
-    "lucide-react": "^0.468.0",
-    "openai": "^6.9.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
     "@testing-library/react": "^16.3.0",
+    "@types/chrome": "^0.0.287",
     "@types/node": "^22.15.0",
     "@types/react": "^18.3.20",
     "@types/react-dom": "^18.3.6",
-    "@vitejs/plugin-react": "^4.4.1",
-    "electron": "^36.2.1",
-    "electron-builder": "^26.0.12",
-    "electron-vite": "^4.0.0",
     "eslint": "^9.24.0",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.31.0",
-    "vite": "^6.3.2",
     "vitest": "^3.1.2"
   }
 }

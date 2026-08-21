@@ -1,20 +1,22 @@
-# AI Whiteboard — pm-zero v12 project rules
+# AI Whiteboard — pm-zero v12.1 project rules
 
 This file is the shared project ruleset. Codex reads it first through `AGENTS.md`; do not
 duplicate these rules there.
 
 ## Product boundary
 
-AI Whiteboard is a Windows-first Electron desktop whiteboard for one person and a family.
-It must support technical work (architecture, code, planning, diagrams) and education/STEM
-(explanations, experiments, lessons, worked examples). The finished v1 includes the desktop
-core, three provider adapters, local history replay, region-scoped AI sends, semantic
-extraction, voice input with a Web Speech fallback, proposed edits with accept/reject and
-provenance, export/import, crash recovery, and accessible keyboard operation.
+AI Whiteboard is a Chrome extension (Manifest V3) that adds a whiteboard input method to
+ChatGPT's web UI (Claude and Gemini in later phases). A launcher button beside the site's own
+composer opens a whiteboard overlay; drawing and pressing "送信" inserts a white-background PNG
+plus an ordered structured text description of what was drawn into that composer. The user
+always presses the site's own send button. **This tool never auto-submits and never reads the
+AI's response** — see `docs/decisions.md` D-013, a hard constraint, not a style choice.
 
-Accounts, cloud collaboration, and always-on telemetry are non-goals for the personal/family
-product. Browser/mobile companions are deferred outside v1. AI is opt-in and network calls
-are visible to the user.
+An earlier standalone Electron desktop app with its own direct AI-provider API calls is
+preserved at git tag `archive/desktop-v1` and is not the active product — see D-009 for why
+that direction was superseded. Accounts, a backend, cloud collaboration, always-on telemetry,
+and stored API keys remain non-goals — the extension calls no AI provider API itself, so there
+are no keys to hold.
 
 ## Source of truth and startup
 
@@ -34,18 +36,25 @@ changing scope. Read `HANDOFF-JA.md` when resuming a handoff. If a path matches 
 
 ## Architecture invariants
 
-- Renderer code is browser-safe React/TypeScript; filesystem, `safeStorage`, native menus,
-  global shortcuts, and provider requests cross an explicit Electron preload boundary.
-- The domain and AWCP contracts are provider-neutral. OpenAI, Anthropic, and Gemini are
-  adapters, never imports from canvas components.
-- Board state is local-first, versioned, and persisted with atomic write/rename plus a
-  recoverable backup and event/snapshot history. API keys use Electron `safeStorage`; plaintext keys never enter board
-  JSON, logs, exports, or renderer storage.
-- AI receives a visible Context Lens selection and a structured AWCP Context Capsule. Never
-  imply hidden chain-of-thought: show interaction order, selected evidence, tool calls, and
-  proposed mutations only.
+- The whiteboard (`apps/extension/src/board/`) runs as an isolated `chrome-extension://` page
+  inside an iframe — never injected directly into the host page's own DOM/React tree, to avoid
+  Excalidraw's global CSS and keyboard handling colliding with the site's own.
+- The content script (`apps/extension/src/content/`) only locates and mutates the host page's
+  DOM; it never throws uncaught (a content script runs on every matched page load — an
+  exception here is user-visible noise on someone else's site, not a contained failure).
+- Board ↔ content-script communication is `postMessage` only, always targeted at an explicit
+  origin and validated (`event.origin`, `event.source`) by both sides on receipt. Never `'*'`.
+- Site differences are isolated behind a `SiteAdapter` interface
+  (`apps/extension/src/content/adapters/types.ts`); a lookup that can't find its target returns
+  `null`, never throws. Insertion logic (`apps/extension/src/content/insert/`) is site-independent
+  and always has a selector-free clipboard fallback as its last tier.
+- `host_permissions` cover only the sites actively supported; adding a site is an explicit,
+  reviewable manifest change, not a broadened wildcard.
 - Excalidraw is the canvas base because it is MIT-licensed. Do not add tldraw without an
   explicit license decision.
+- Never add code that auto-submits a message on the host site or reads/surfaces the AI's
+  response — see `docs/decisions.md` D-013. A change that touches this needs that decision
+  revisited first, not a quiet workaround.
 
 ## Quality and workflow
 

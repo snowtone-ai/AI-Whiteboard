@@ -3,7 +3,15 @@ import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
   {
-    ignores: ['**/node_modules/**', '**/dist/**', '**/out/**', '**/release/**', '**/coverage/**'],
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/out/**',
+      '**/release/**',
+      '**/coverage/**',
+      '**/.agents/**',
+      '**/.claude/skills/**',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,

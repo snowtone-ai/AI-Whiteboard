@@ -51,9 +51,68 @@ Use a restrained graphite/blue/coral/chalk palette, Japanese-friendly system fon
 distinctive Context Lens film-strip. The board remains visually dominant; complexity, minimap,
 and privacy status are high-signal utilities rather than dashboard chrome.
 
-## D-008 — complete v1 before companion surfaces (2026-08-20)
+## D-008 — complete v1 before companion surfaces (2026-08-20) — superseded by D-013
 
 Finish Windows desktop core, all three providers, history replay, semantic extraction, voice,
 proposed edits, exports, and recovery as one complete v1. Do not call a reduced subset “MVP”
 and ship it as complete. Browser/mobile clients and real-time collaboration are explicitly
 deferred.
+
+## D-009 — browser-extension input method, not a desktop app (2026-08-21) — supersedes D-001
+
+The desktop build (tag `archive/desktop-v1`) solved the wrong problem: a standalone app that
+calls AI provider APIs itself is a second chat app, not an input method for the chat sites the
+user already uses. The actual request was for a whiteboard selectable *inside* ChatGPT's own
+web UI, under the user's own account, with the AI call staying on that site. Electron, its
+main/preload boundary, and its packaging pipeline are dropped entirely — there is no process
+to be. The product is now a Manifest V3 Chrome extension: a content script that injects a
+launcher into the host page, and a whiteboard that runs as an isolated `chrome-extension://`
+page inside an iframe (not injected directly into the page's own DOM/React tree), because
+Excalidraw's global CSS and keyboard handling would otherwise collide with the host site's.
+Old desktop build preserved at git tag `archive/desktop-v1`, not deleted.
+
+## D-010 — no stored API keys (2026-08-21) — supersedes D-004
+
+D-004's `safeStorage` key vault existed to hold provider API keys for this app's own direct
+provider calls. Under D-009 there are no such calls — the AI request happens through the
+website the user is already signed into. The key vault, and the entire class of risk it
+existed to contain, is deleted rather than weakened. This is the strongest security outcome of
+the pivot: the product's largest attack surface no longer exists.
+
+## D-011 — AWCP survives as a site-adapter contract, not a provider contract (2026-08-21) — amends D-005
+
+The original AWCP normalized *provider* differences (OpenAI/Anthropic/Gemini APIs) behind one
+contract. That half is gone with D-010. What remains valuable is the shape of the idea: a
+`SiteAdapter` interface (`apps/extension/src/content/adapters/types.ts`) normalizes *site DOM*
+differences (ChatGPT/Claude/Gemini composer markup) behind one contract, so the insertion logic
+in `apps/extension/src/content/insert/` stays identical across sites. Only the adapter's
+`findComposer`/`findFileInput`/`findAnchor` lookups are site-specific and expected to need
+maintenance as each site's markup changes; they must fail by returning `null`, never by
+throwing, so a broken selector degrades a feature instead of breaking the page. Every insertion
+path also falls back to copying the image to the clipboard with a visible instruction — the one
+tier that depends on no selector at all.
+
+## D-012 — Context Lens narrows to pre-insert review (2026-08-21) — amends D-006
+
+The proposal/accept/reject loop from D-006 assumed the tool receives an AI response to review.
+Under D-009 it never does — there is no response to review, only a drawing about to be sent.
+What survives is the underlying principle: nothing leaves the whiteboard without the user
+having seen exactly what will be sent. In v1 this is deliberately minimal (see the board's
+single "送信" action and its status line in `apps/extension/src/board/Board.tsx`), not the full
+region/privacy-switch UI from the desktop build — that UI can come back if a real need for it
+shows up, per `docs/vision.md`.
+
+## D-013 — never auto-submit, never read the response (2026-08-21) — supersedes D-008
+
+This is the hard constraint the whole design sits on top of, and it is a deliberate risk
+decision, not just a UX choice. Anthropic's and OpenAI's terms of use restrict automated access
+to their consumer products, and Anthropic has taken technical enforcement action on this in
+2026. A tool that fills the composer and stops — the user always presses the site's own send
+button, and this extension never reads or acts on the reply — sits in the same category as an
+IME or a tool like Grammarly: it augments human input into a page the human is actively using.
+A tool that also clicks send and reads the response would cross into automated access to the
+service, which is explicitly out of scope here. If a future change proposes auto-submitting a
+message or surfacing the AI's reply inside this extension, that proposal must come back to this
+decision first — it is not an incremental feature, it is reopening a boundary that was drawn on
+purpose. "Complete v1" for this product is redefined around the open/draw/send loop in
+`docs/vision.md`, not around feature parity with the archived desktop build.

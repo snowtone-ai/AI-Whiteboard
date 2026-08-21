@@ -4,44 +4,53 @@ Updated: 2026-08-21
 
 ## Current
 
-The complete personal/family Windows v1 is implemented on `feat/complete-ai-whiteboard`.
-It includes the Excalidraw canvas, provider-neutral AWCP Context Lens, OpenAI/Anthropic/Gemini
-streaming adapters, semantic capsules, reviewable AI proposals, local history/replay,
-voice input, import/export, atomic persistence and encrypted API-key storage. The application
-does not require an account, backend or telemetry service.
+The project pivoted from a standalone Electron desktop app to a Chrome extension (Manifest V3)
+that adds a whiteboard input method to ChatGPT's web UI. See `docs/decisions.md` D-009–D-013
+for the full reasoning. The previous complete desktop build is preserved at git tag
+`archive/desktop-v1` (branch `feat/complete-ai-whiteboard`, now closed as a PR) and is not part
+of the active codebase.
 
-The pm-zero v12.1 UI operating layer is applied: setup detects the React UI, provisions only
-the project-local Impeccable skill and Chrome DevTools MCP, and `verify` checks registered
-design values in changed frontend lines. Global Codex integration is reduced to `context7`;
-browser and artifact plugins remain disabled unless a future task has a concrete need.
+Implemented on `feat/browser-input-method`:
+
+- `apps/extension/`: MV3 extension — a ChatGPT-only content script (launcher button + overlay
+  mount), a whiteboard board page (Excalidraw, self-hosted fonts, runs as an isolated
+  `chrome-extension://` iframe), and an insertion ladder (file-attach → clipboard fallback).
+  Built with esbuild (`apps/extension/build.mjs`), no Vite/Electron in the toolchain.
+- `packages/core/`: unchanged and currently unused by the extension. Kept dormant rather than
+  deleted — parts of it (regions, semantics, privacy switches) may be relevant again if the
+  Context Lens grows past its current minimal pre-insert review. See D-011/D-012.
 
 ## Product contract to preserve
 
-Windows desktop first; Excalidraw MIT canvas; local-first atomic JSON plus recovery journal;
-Electron `safeStorage` for API keys; OpenAI, Anthropic and Gemini adapters; AWCP Context Lens
-and portable Context Capsule; region/minimap/complexity; semantic extraction; explicit voice;
-proposal diff with accept/reject/provenance; history replay; exports; fast global shortcut.
-No accounts, backend, cloud collaboration or always-on telemetry by default. Defaults:
-`gpt-5.6-luna`, `claude-sonnet-5`, `gemini-3.7-flash`.
+ChatGPT web UI, launcher button beside the composer, whiteboard overlay, send = PNG (white
+background) + an ordered structured text description of what was drawn, inserted into the
+composer. The user always presses the site's own send button — this extension never
+auto-submits and never reads the AI's response (D-013, hard constraint). No accounts, backend,
+telemetry, or stored API keys — there are none to store, since this tool doesn't call any AI
+provider API itself.
 
 ## Next
 
-1. Merge the pull request after external CI passes.
-2. Configure any provider API key locally and make one live request before family use.
-3. Sign future public installers if distribution expands beyond personal/family devices.
+1. Manual smoke test on chatgpt.com with a real logged-in session (cannot be run from this
+   environment — see `docs/adapter-smoke.md` for the checklist and record the result there).
+2. Load the unpacked extension (`apps/extension/dist/` after `pnpm build`) via
+   `chrome://extensions` → Developer mode → Load unpacked, and confirm the launcher button
+   appears, the board opens, and send attaches an image to the composer.
+3. Claude adapter, then Gemini adapter, each as its own reviewable change — see `tasks.md`.
 
 ## Verification status
 
-- `pnpm test`: 26 tests across core, renderer, validation, persistence recovery and provider
-  offline behavior pass.
-- Browser interaction: prompt streaming fallback, proposal accept, provider switch and export
-  chooser pass at 1440x900 with no console errors.
-- `pnpm verify`, `pnpm audit --prod`, packaged Electron smoke and NSIS installer generation
-  pass locally. External CI remains the final merge gate.
-- Live provider requests remain credential-dependent and were not sent from the repository.
+- `pnpm verify` (lint, typecheck, test, build) passes locally: 18 tests (5 new for
+  `summarizeBoard`, 13 existing in `packages/core`), clean lint/typecheck, extension bundle
+  builds (`content.js` ~5KB, `board.js` ~8MB minified — Excalidraw + React bundled once).
+- No live-browser smoke test has been run yet. The adapter (`apps/extension/src/content/
+  adapters/chatgpt.ts`) targets ChatGPT's current DOM as of this writing; it is written to
+  degrade to the clipboard fallback rather than fail outright if the markup has moved, but
+  that has not been exercised against the live site.
 
 ## Known assumptions
 
-- Node.js 22.12+ and pnpm 10.12 are the supported development baseline on Windows 11.
-- Electron main/preload are the only native boundary; renderer remains browser-safe.
-- Browser/mobile portability is provided by exports and Context Capsules, not a second client.
+- Chrome (Chromium-based; Edge/Brave should work unmodified, untested) on Windows 11.
+- Node.js 22.12+ and pnpm 10.12 remain the build baseline.
+- `chrome.storage`/local persistence is not yet implemented — the board does not currently
+  save drafts between opens. Not required for the core loop; add if it becomes a real need.

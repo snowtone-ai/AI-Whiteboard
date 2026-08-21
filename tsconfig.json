@@ -13,13 +13,14 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
     "baseUrl": ".",
+    "types": ["chrome"],
     "paths": {
       "@ai-whiteboard/core": ["packages/core/src/index.ts"]
     }
   },
   "include": [
-    "apps/desktop/src/**/*.ts",
-    "apps/desktop/src/**/*.tsx",
+    "apps/extension/src/**/*.ts",
+    "apps/extension/src/**/*.tsx",
     "packages/*/src/**/*.ts",
     "packages/*/src/**/*.tsx"
   ]
