@@ -1,0 +1,117 @@
+:root {
+  --ink: #182027;
+  --ink-strong: #11181D;
+  --blue: #295BFF;
+  --coral: #FF6B4A;
+  --chalk: #F7F8F4;
+  --border: #DDE3EA;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family:
+    'Yu Gothic UI',
+    'Hiragino Sans',
+    'Noto Sans JP',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    system-ui,
+    sans-serif;
+  color: var(--ink);
+  background: var(--chalk);
+}
+
+.board-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.board-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--ink-strong);
+  color: var(--chalk);
+  flex: 0 0 auto;
+}
+
+.board-title {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.board-header button.icon {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--chalk);
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.board-header button.icon:hover {
+  background: rgba(247, 248, 244, 0.16);
+}
+
+.board-canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+}
+
+.board-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--chalk);
+  flex: 0 0 auto;
+}
+
+.board-status {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.send-button {
+  appearance: none;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--chalk);
+  background: var(--blue);
+  cursor: pointer;
+  transition: filter 120ms;
+}
+
+.send-button:hover {
+  filter: brightness(1.08);
+}
+
+.send-button:disabled {
+  filter: grayscale(0.4);
+  cursor: default;
+}

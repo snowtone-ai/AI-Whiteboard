@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "AI Whiteboard — チャット入力",
+  "version": "0.1.0",
+  "description": "ChatGPTなどのチャット入力欄の横にホワイトボードを開き、描いた図を画像として送れるようにします。",
+  "icons": {
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_icon": {
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["board.html", "board.js", "board.css", "fonts/*"],
+      "matches": ["https://chatgpt.com/*", "https://chat.openai.com/*"]
+    }
+  ],
+  "permissions": ["clipboardWrite"],
+  "host_permissions": ["https://chatgpt.com/*", "https://chat.openai.com/*"]
+}

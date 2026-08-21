@@ -1,0 +1,19 @@
+/**
+ * A SiteAdapter only *locates* things in the host page's DOM. It never
+ * mutates the page directly — that keeps the one part of this extension
+ * that is guaranteed to break on a site redesign (selectors) isolated from
+ * the insertion logic, which stays stable across sites.
+ *
+ * Every method must return null instead of throwing when it can't find its
+ * target — a missing element is an expected, recoverable state here, not
+ * an error.
+ */
+export interface SiteAdapter {
+  readonly id: string
+  /** The element the launcher button should anchor its position to. */
+  findAnchor(): HTMLElement | null
+  /** The editable message box text gets inserted into. */
+  findComposer(): HTMLElement | null
+  /** The (usually hidden) file input used for image attachments. */
+  findFileInput(): HTMLInputElement | null
+}
