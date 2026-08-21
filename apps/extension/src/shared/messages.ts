@@ -6,7 +6,6 @@
 export interface SendPayload {
   type: 'ai-whiteboard:send'
   png: ArrayBuffer
-  summary: string
 }
 
 export interface ClosePayload {

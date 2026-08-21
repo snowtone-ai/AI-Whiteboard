@@ -3,7 +3,6 @@ import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { BoardToHostMessage, HostToBoardMessage } from '../shared/messages'
-import { summarizeBoard } from './summarize'
 
 /**
  * The board is embedded as a chrome-extension:// iframe inside the host page
@@ -72,9 +71,8 @@ export function Board() {
         },
       })
       const png = await blob.arrayBuffer()
-      const summary = summarizeBoard(elements)
 
-      postToHost({ type: 'ai-whiteboard:send', png, summary }, [png])
+      postToHost({ type: 'ai-whiteboard:send', png }, [png])
     } catch (error) {
       console.error('[ai-whiteboard] export failed', error)
       setStatus({ kind: 'error', text: '書き出しに失敗しました。もう一度お試しください。' })

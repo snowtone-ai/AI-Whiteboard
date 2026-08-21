@@ -116,3 +116,24 @@ message or surfacing the AI's reply inside this extension, that proposal must co
 decision first — it is not an incremental feature, it is reopening a boundary that was drawn on
 purpose. "Complete v1" for this product is redefined around the open/draw/send loop in
 `docs/vision.md`, not around feature parity with the archived desktop build.
+
+## D-014 — send the PNG only, no auto-generated text summary (2026-08-21)
+
+`summarize.ts` turned a board's elements into an ordered text list (`四角形1`, `矢印3（四角形1 →
+四角形2）`, `手書きの絵（N画）`) inserted into the composer alongside the PNG. Investigation
+(prompted by the user questioning whether this had any real value) found it added ~zero verified
+information across both major usage patterns: for shape diagrams beyond a trivial handful of
+elements the labels are unverifiable by a model reading the image (no spatial correlation between
+a label and its mark — established separately), so "connects A to B" is noise dressed as signal;
+for freedraw-heavy boards — the realistic common case for a *whiteboard* — the summary could only
+ever report a stroke count, never what was actually drawn, since this extension deliberately never
+calls an AI vision model itself to describe it (see D-010). The one external-research finding that
+could have justified structured metadata (VLMs benefit from diagram topology info) specifically
+requires that metadata be *grounded* to the image (e.g. an ID visible at that element's position)
+— ours never was. Given the choice between trimming the summary to only literal typed-text content
+or removing it outright, removing it outright was chosen: simpler, and it fully closes the
+original "could balloon into chat clutter" concern at the root instead of capping it.
+`summarize.ts`, its test, and the now-unused `insertText.ts` insertion tier are deleted; `SendPayload`
+no longer carries a `summary` field. The board now sends the PNG alone. This does not reopen
+D-013 — the user still always presses the site's own send button; only the auto-generated text
+payload is gone, not the manual-send boundary.

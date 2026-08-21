@@ -17,9 +17,9 @@ weeks as unverified.
    - [ ] The launcher button (✎) appears near the message composer and follows it on scroll/resize.
    - [ ] Clicking it opens the whiteboard overlay; drawing works; the close button (✕) and
          Escape both close it.
-   - [ ] Drawing something with at least two connected shapes and one text element, then
-         pressing 送信, either:
-     - attaches the image to the composer and inserts the ordered text description, or
+   - [ ] Drawing something, then pressing 送信, either:
+     - attaches the image to the composer (image only — no auto-generated text is inserted,
+       see D-014), or
      - falls back to "copied to clipboard" with a visible message, and Ctrl+V in the composer
        actually pastes the image.
    - [ ] After attach, the board panel should auto-close within ~1-2 seconds, revealing the real

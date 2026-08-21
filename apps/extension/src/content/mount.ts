@@ -1,6 +1,5 @@
 import type { BoardToHostMessage, HostToBoardMessage, InsertOutcome } from '../shared/messages'
 import { attachImageFile } from './insert/attachFile'
-import { insertTextIntoComposer } from './insert/insertText'
 import { UPLOAD_INDICATOR_SELECTOR, waitForUploadSettle } from './insert/waitForUploadSettle'
 import type { SiteAdapter } from './adapters/types'
 
@@ -162,12 +161,7 @@ export function mountLauncher(adapter: SiteAdapter): void {
     if (event.key === 'Escape') closeOverlay()
   }
 
-  async function runInsertionLadder(png: ArrayBuffer, summary: string): Promise<InsertOutcome> {
-    const composer = adapter.findComposer()
-    if (composer && summary) {
-      insertTextIntoComposer(composer, summary)
-    }
-
+  async function runInsertionLadder(png: ArrayBuffer): Promise<InsertOutcome> {
     const fileInput = adapter.findFileInput()
     if (fileInput) {
       const file = new File([png], 'whiteboard.png', { type: 'image/png' })
@@ -207,7 +201,7 @@ export function mountLauncher(adapter: SiteAdapter): void {
     }
 
     if (message.type === 'ai-whiteboard:send') {
-      runInsertionLadder(message.png, message.summary)
+      runInsertionLadder(message.png)
         .then((outcome) => {
           const reply: HostToBoardMessage = { type: 'ai-whiteboard:result', outcome }
           iframe?.contentWindow?.postMessage(reply, extensionOrigin())

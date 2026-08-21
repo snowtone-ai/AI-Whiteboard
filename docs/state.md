@@ -1,7 +1,7 @@
 # state.md — current project state
 
-Updated: 2026-08-21 (round 3: overlay auto-close, generic upload-settle detection, empirical
-check of whether the text summary adds value beyond the image)
+Updated: 2026-08-21 (round 4: text summary feature removed entirely — image-only send — see
+D-014)
 
 ## Current
 
@@ -23,12 +23,12 @@ Implemented on `feat/browser-input-method`:
 
 ## Product contract to preserve
 
-ChatGPT web UI, launcher button beside the composer, whiteboard overlay, send = PNG (white
-background) + an ordered structured text description of what was drawn, inserted into the
-composer. The user always presses the site's own send button — this extension never
-auto-submits and never reads the AI's response (D-013, hard constraint). No accounts, backend,
-telemetry, or stored API keys — there are none to store, since this tool doesn't call any AI
-provider API itself.
+ChatGPT web UI, launcher button beside the composer, whiteboard overlay, send = a white-background
+PNG of the drawing, attached to the composer (or copied to the clipboard as a fallback). No
+accompanying auto-generated text is inserted — see D-014 for why. The user always presses the
+site's own send button — this extension never auto-submits and never reads the AI's response
+(D-013, hard constraint). No accounts, backend, telemetry, or stored API keys — there are none to
+store, since this tool doesn't call any AI provider API itself.
 
 ## Round 2 fixes (user-reported, from real usage)
 
@@ -46,8 +46,10 @@ The user loaded the extension and reported four issues by screenshot; all four a
   literal UTF-8 — so that check couldn't have found real content either way. Fixed method, not
   a fixed bug: the `langCode` prop worked correctly the whole time.)
 - **Hand-drawn strokes produced a useless "手書き線1"…"手書き線9" list** in the composer
-  (`apps/extension/src/board/summarize.ts`): consecutive `freedraw` elements now collapse into
-  one `手書きの絵（N画）` entry instead of being numbered individually.
+  (`apps/extension/src/board/summarize.ts`): consecutive `freedraw` elements were collapsed into
+  one `手書きの絵（N画）` entry instead of being numbered individually. **Superseded by D-014**:
+  `summarize.ts` no longer exists — the whole per-element text summary was removed, not just this
+  one case of it.
 - **Launcher button overlapped the response text** instead of sitting beside the composer
   (`apps/extension/src/content/adapters/chatgpt.ts`, `mount.ts`): anchor changed from the
   composer text node to its parent `<form>` (the whole input bar, roughly constant height);
@@ -65,11 +67,10 @@ Two more issues raised in the same follow-up, also addressed:
   (`mount.ts`'s `runInsertionLadder`). This is a best-effort delay, not a guaranteed fix — there
   is no reliable way to detect true upload completion from outside the site's own UI. Needs
   confirmation from the user's own live session.
-- **Text summary could balloon into chat-cluttering length**: `summarize.ts` now caps the
-  per-item list at 12 items / 400 characters; past that it switches to a one-line
-  count-by-type summary (e.g. "画像には合計21個の要素があります（手書きの絵1か所（計2画）、
-  四角形20個）。詳細は添付画像を参照してください。"). The PNG remains the full-detail source
-  either way.
+- **Text summary could balloon into chat-cluttering length**: `summarize.ts` capped the per-item
+  list at 12 items / 400 characters, falling back to a one-line count-by-type summary past that.
+  **Superseded by D-014**: moot now that no text summary is generated at all — the strongest
+  possible fix for "the text could clutter the chat" is not sending any.
 - **Whether text labels correlate to specific strokes in the image**: answered directly (no
   code change needed) — they don't. Labels are drawing-order sequence numbers only; there is no
   spatial link between a label and a mark's position in the PNG.
@@ -107,7 +108,7 @@ fixes derived from reading our own code plus research, not a live-verified root 
 **Still needs the user's own live-session confirmation** — this round's fixes are structurally
 sound and unit-tested where testable, but neither has been exercised against real chatgpt.com.
 
-## Whether the text summary is actually useful alongside the image (user question, verified)
+## Whether the text summary is actually useful alongside the image — first pass (superseded by D-014)
 
 Built the real production pipeline (`board.js`/`board.css` from an actual `pnpm build`) into a
 throwaway Playwright test harness (temp files under the gitignored `dist/`, deleted after use)
@@ -118,18 +119,46 @@ the real `summarizeBoard()` output and the real exported PNG side by side.
 Result: for that diagram, the PNG alone was already fully unambiguous — the arrow's direction and
 both endpoints were clear from pixels alone, so the text summary line
 (`3. 四角形3（四角形1 → 四角形2）`) told a vision model nothing the image didn't already show.
-This matches external research on redundant text alongside images for vision-language models:
-captions/text help most where content couples visual and symbolic/linguistic features (labeled
-axes, embedded text, ambiguous connections in a complex diagram), and can otherwise compete with
-the image for attention or add nothing (see Sources below). Conclusion: keep the text summary —
-it is cheap and its value scales with diagram complexity/ambiguity, exactly the case where a
-human or AI reader would also struggle from pixels alone — but don't expect it to add value for
-simple, already-legible drawings. No code change was needed for this question; this confirms the
-existing design (PNG as the primary source of truth, text summary as a lightweight supplement)
-rather than motivating a change.
+At the time this was read as "the summary is cheap and only matters for complex/ambiguous
+diagrams, so keep it" — **that conclusion turned out to be wrong, corrected below in D-014.**
+
+## D-014 — the text summary was removed entirely, image-only send (2026-08-21)
+
+The user pushed back on the first-pass conclusion above with two sharp points, both correct:
+
+1. The external research cited above ("captions help VLMs") is about captions that *describe
+   image content* (what's depicted, OCR'd embedded text, axis labels) — not about *drawing-order
+   bookkeeping* (`四角形1`, `矢印3（四角形1 → 四角形2）`) with no way to map a label back to a
+   specific mark in the picture (already established: no spatial correlation exists). A second,
+   more targeted search found research on VLMs genuinely struggling with diagram *topology*
+   extraction, where structured metadata *does* help — but only when it's grounded (e.g. an ID
+   that also appears at that element's position in the image, as in XML-driven approaches). Our
+   labels were never grounded that way, so the one piece of research that could have justified
+   the connection metadata doesn't actually apply to how it was built. With more than a couple of
+   same-type shapes on the board, "矢印3は四角形1→四角形2" is unverifiable by the model and
+   becomes noise dressed up as signal, not a safety net.
+2. For freedraw-heavy boards — the realistic common case for a *whiteboard* — the summary could
+   only ever say "手書きの絵（N画）"; it fundamentally cannot describe what was drawn without
+   running actual image understanding, which this extension deliberately never does (no AI
+   provider calls — see "Product contract to preserve"). So for the dominant use case, the
+   feature was structurally incapable of adding information, not just weak in edge cases.
+
+Net: across both major usage patterns (freehand sketches, shape diagrams beyond the trivial
+case), the auto-generated summary added ~zero verifiable value, while being the exact mechanism
+the user originally worried would clutter the chat. Given a straight choice between "strip it to
+only the literal typed-text content" and "remove entirely," the user chose full removal — the PNG
+is now the sole payload sent to the composer.
+
+**Removed**: `apps/extension/src/board/summarize.ts` + its test, `apps/extension/src/content/
+insert/insertText.ts` (now unused — nothing calls it once no text is generated), the `summary`
+field from `SendPayload` (`shared/messages.ts`), and all call sites in `Board.tsx` / `mount.ts`.
+
+This does not reopen D-013 — the user still always presses the site's own send button; this
+change only removes an *auto-generated text payload*, not any part of the manual-send boundary.
 
 Sources: [Vision Language Model-based Caption Evaluation Method](https://arxiv.org/html/2402.17969v1),
-[Beyond Intermediate States: Explaining Visual Redundancy through Language](https://arxiv.org/pdf/2503.20540)
+[Beyond Intermediate States: Explaining Visual Redundancy through Language](https://arxiv.org/pdf/2503.20540),
+[Overcoming Vision Language Model Challenges in Diagram Understanding](https://arxiv.org/abs/2502.04389)
 
 ## Next
 
@@ -145,8 +174,8 @@ Sources: [Vision Language Model-based Caption Evaluation Method](https://arxiv.o
 
 ## Verification status
 
-- `pnpm verify` (lint, typecheck, test, build) passes locally: 18 tests (5 new for
-  `summarizeBoard`, 13 existing in `packages/core`), clean lint/typecheck, extension bundle
+- `pnpm verify` (lint, typecheck, test, build) passes locally: 17 tests (4 for
+  `waitForUploadSettle`, 13 existing in `packages/core`), clean lint/typecheck, extension bundle
   builds (`content.js` ~5KB, `board.js` ~8MB minified — Excalidraw + React bundled once).
 - No live-browser smoke test has been run yet. The adapter (`apps/extension/src/content/
   adapters/chatgpt.ts`) targets ChatGPT's current DOM as of this writing; it is written to
